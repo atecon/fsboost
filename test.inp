@@ -1,0 +1,133 @@
+set verbose off
+clear
+
+string wd = "/home/at/git/forward_stagewise"
+
+#include "@wd/fsa.inp"		# SET PATH
+
+scalar runEX = 2		# select an example
+
+# specify some penalty values
+# TODO: let's do the following within the function:
+/* If the user doesn't specify lambda or nlambda,
+   we set nlambda=100 and lmax=400
+   In glmnet() a pre-check is ran: set lmax
+   there where most coefficients are 'close to zero'
+*/
+
+# Select an example
+if runEX==1
+    open australia.gdt -q --preserve
+
+    # define the variables
+    series LHS = ldiff(PAU)
+    list RHS = const LHS(-1 to -2) IUS(-1 to -2)  IAU(-1 to -2)
+
+elif runEX==2
+    # Dataset from glmnet
+    open "@wd/glmnet_QSE.csv" --quiet --preserve
+    #setobs 1 1 --special-time-series
+    setobs 1 1 --cross-section
+
+    rename X1 LHS
+    list RHS = const dataset
+    RHS -= LHS
+
+elif runEX==3
+    # SIMULATION
+    nulldata 1000
+    set seed 1234
+    setobs 1 1 --time-series
+    series e = normal()
+    series LHS = 1
+    series LHS = 4.3 + 0.8*LHS(-1) - 0.4*LHS(-2) + e
+    matrix X = mnormal($nobs,25)		# further exogenous
+    list RHS = const LHS(-1 to -6)		# arbtrary lags of the endogenous
+    loop i=1..cols(X) -q
+        series S$i = X[,i]
+        RHS += S$i
+    endloop
+
+endif
+ols LHS RHS
+omit --auto=0.05
+smpl --no-missing LHS RHS
+
+#-----------------------------
+
+# Standardize
+list RHStilde = RHS - const
+# check for constant
+scalar wconst = nelem(RHStilde) < nelem(RHS) ? 1 : 0
+
+# standardize and save factors for later
+strings Xnames = varnames(RHS)
+list RHStilde = RHS - const
+# check for constant
+scalar wconst = nelem(RHStilde) < nelem(RHS) ? 1 : 0
+
+# standardize and save factors for later
+matrix my = cdemean({LHS})
+scalar ysd = sdc(my)
+my = my ./ ysd
+mX = cdemean({RHStilde})
+matrix Xsd = sdc(mX)			# gives row vector
+mX = mX ./ Xsd
+
+
+
+#======================================
+# (Incremental) Forward Stagewise
+
+# A version of least squares boosting for
+# multiple linear regression:
+# (assume predictors are standardized)
+#======================================
+scalar eta = 0.001
+matrix res = {LHS-mean(LHS)}			# initial value
+scalar n_rounds = 20000
+
+matrix bhat = zeros(cols(mX),1)
+
+set stopwatch
+loop i=1..n_rounds -q
+
+    # series most correlated with res
+    matrix mat = zeros(cols(mX),1)
+    loop j=1..cols(mX) -q
+        mat[j] = mcorr(res~mX[,j])[1,2]
+    endloop
+    scalar winner = imaxc(abs(mat))
+    scalar rho = mat[winner]
+    
+    # Early stopping
+    if abs(rho)<=0.01			# 
+        printf "\nEarly stopping after %d iterations.\n", $i
+        break
+    endif    
+    
+    # OLS would be equivalent to using directly rho!
+    #scalar rho = mols(res,mX[,winner])
+
+    # update bhat
+    scalar delta = eta * ((rho>=0) ? 1 : -1)
+    bhat[winner] += delta
+    # update res
+    res = res - delta * mX[,winner]
+endloop
+printf "\nThis took %g sec.\n", $stopwatch
+
+printf "\nStandardized coefficients:\n"
+print bhat
+
+# rescale
+beta = bhat
+beta = beta .* (ysd ./ Xsd')
+# add intercept
+series uhat = LHS - lincomb(RHStilde,beta)
+beta = mean(uhat) | beta
+printf "\nRe-scaled coefficients:\n"
+print beta
+
+
+

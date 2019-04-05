@@ -1,0 +1,15 @@
+author = Artur Tarassow
+email = atecon@posteo.de
+version = 0.1
+date = 2019-03-29
+description = Compile cross-validation datasets
+tags = C52
+min-version = 2018a
+#data-requirement = needs-time-series-data
+#gui-main = avgfc_gui
+#label = naive forecast(s)
+#menu-attachment = MAINWIN/Model/TSModels
+public = CvDataGenerator
+#menu-only = avgfc_gui 
+help = CvDataGenerator_help.txt
+sample-script = CvDataGenerator_sample.inp

@@ -1,0 +1,108 @@
+set verbose off
+clear 
+
+#include ridge.gfn --force
+
+string wd = "/home/at/git/ridge"
+
+include "@wd/ridge.inp"		# SET PATH
+
+scalar runEX = 2		# select an example
+
+# specify some penalty values
+# TODO: let's do the following within the function:
+/* If the user doesn't specify lambda or nlambda, 
+ we set nlambda=100 and lmax=400
+ In glmnet() a pre-check is ran: set lmax
+ there where most coefficients are 'close to zero'
+*/
+
+# Select an example
+if runEX==1
+    open australia.gdt -q --preserve
+    
+    # define the variables
+    series LHS = ldiff(PAU)
+    list RHS = const LHS(-1 to -2) IUS(-1 to -2)  IAU(-1 to -2)
+    
+    ols LHS RHS
+
+    
+elif runEX==2
+    # Dataset from glmnet
+    open "@wd/glmnet_QSE.csv" --quiet  --preserve
+    setobs 1 1 --special-time-series
+    setobs 1 1 --cross-section
+
+    rename X1 LHS
+    list RHS = const dataset
+    RHS -= LHS
+    
+elif runEX==3
+    # SIMULATION
+    nulldata 500
+    set seed 1234
+    setobs 1 1 --time-series
+    series e = normal()
+    series LHS = 1
+    series LHS = 4.3 + 0.8*LHS(-1) - 0.4*LHS(-2) + e
+    matrix X = mnormal($nobs,25)		# further exogenous
+    list RHS = const LHS(-1 to -6)		# arbtrary lags of the endogenous
+    loop i=1..cols(X) -q
+        series S$i = X[,i]
+        RHS += S$i
+    endloop    
+endif
+
+# run the main function with default values
+#===========================================
+bundle opts = null
+
+# lambda values to evaluate (optional; default 100 values between [0.1,400])
+#matrix opts.lambdas = {0.6,5}
+# Loss function for CV (optional, default "rmse")
+scalar opts.l_min = 0.001
+scalar opts.l_max = 200
+string opts.loss_type = "mape"		# 'me', 'rmse' (default), 'mae', 'mape'
+string opts.cv_type = "rolwin"			# 'kfold' (default), 'loo', 'rolwin', 'recwin'
+
+# Run training and evaluation using cross-validation
+#====================================================
+bundle b_ridge = ridge(LHS, RHS, opts)
+
+# Plot loss as a function of lambda
+plot_loss(&b_ridge)
+
+# Plot solution path
+plot_beta(&b_ridge)
+
+# Grab coeff. conditional on optimal lambda
+#==========================================
+eval b_ridge.beta_min
+
+
+/* DEPRECATED?
+
+# compare with the (computationally) naive alternative
+# (matrix-based function)
+matrix rn = ridge_naive(lambdas[1], {LHS}, {RHS})
+print rn
+
+## compare with OLS results
+print "-- OLS comparison --"
+ols LHS RHS
+
+## now test an underdetermined case, #param > #obs:
+numk = 20
+N = 10
+matrix my = mnormal(N, 1)
+matrix mX = mnormal(N, numk)
+
+# use the matrix-based backend function directly
+eval ridge_svd(lambdas[1], my, mX)[,1]
+
+## do a mechanical test of a no-constant case
+RHS = RHS - const
+bundle b_ridge = ridge(lambdas, LHS, RHS)
+print b_ridge
+*/
