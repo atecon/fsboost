@@ -83,16 +83,16 @@ mX = mX ./ Xsd
 # multiple linear regression:
 # (assume predictors are standardized)
 #======================================
-scalar eta = 0.001
-matrix res = {LHS-mean(LHS)}			# initial value
+scalar eta = 0.001						# kind of learning rate
+matrix res = {LHS-mean(LHS)}			# initial value of residuals
 scalar n_rounds = 20000
 
-matrix bhat = zeros(cols(mX),1)
+matrix bhat = zeros(cols(mX),1)			# store standadized coefficients
 
 set stopwatch
 loop i=1..n_rounds -q
 
-    # series most correlated with res
+    # get series most correlated with res
     matrix mat = zeros(cols(mX),1)
     loop j=1..cols(mX) -q
         mat[j] = mcorr(res~mX[,j])[1,2]
@@ -100,7 +100,7 @@ loop i=1..n_rounds -q
     scalar winner = imaxc(abs(mat))
     scalar rho = mat[winner]
     
-    # Early stopping
+    # Early stopping -- could also use CV instead
     if abs(rho)<=0.01			# 
         printf "\nEarly stopping after %d iterations.\n", $i
         break
@@ -113,8 +113,9 @@ loop i=1..n_rounds -q
     scalar delta = eta * ((rho>=0) ? 1 : -1)
     bhat[winner] += delta
     # update res
-    res = res - delta * mX[,winner]
+    res -= delta * mX[,winner]
 endloop
+
 printf "\nThis took %g sec.\n", $stopwatch
 
 printf "\nStandardized coefficients:\n"
