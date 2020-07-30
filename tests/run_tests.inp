@@ -1,0 +1,9 @@
+set verbose off
+clear
+
+include assertion.gfn
+
+include "./src/fsa.inp" --force
+
+
+printf "\nInfo: All tests passed.\n"

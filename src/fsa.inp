@@ -1,0 +1,84 @@
+function bundle default_fsa_opts (const series y,
+                                const list X)
+
+    # Set default values
+    bundle self = null
+    scalar self.eta = 0.1         # kind of learning rate
+    scalar self.n_iterations = 10#00
+    series self.initial_residuals = y - mean(y)
+
+    return self
+end function
+
+
+function bundle fsa (series y "Dep. variable",
+                       list X "Candidates",
+                       bundle opts[null])
+
+    /* Main function */
+
+    smpl y X --no-missing         # TODO: impacts on initial_residuals
+
+    bundle self = default_fsa_opts(y, X)
+    if exists(opts)
+        self = opts + self         # override defaults
+    endif
+
+
+    # Put some stuff to the bundle
+    series self.y = y
+    list self.X = X
+    strings self.Xnames = varnames(X)
+    list self.Xtilde = X - const
+    # check for constant
+    scalar self.with_constant = nelem(self.Xtilde) < nelem(self.X) ? 1 : 0
+
+    # TODO: put to function: standardize and save factors for later
+    matrix my = cdemean({y})
+    scalar self.ysd = sdc(my)
+    self.my = my ./ self.ysd
+    matrix mX = cdemean({self.Xtilde})
+    matrix self.Xsd = sdc(mX)			# gives row vector
+    self.mX = mX ./ self.Xsd
+
+    matrix self.betas = zeros(cols(self.mX), self.n_iterations)
+
+    fsa_estimator(&self)
+
+
+    return self
+end function
+
+
+function void fsa_estimator (bundle *self)
+    /* code description
+    return: type, description */
+
+    series resids = self.initial_residuals
+    matrix rX = {self.initial_residuals} ~ self.mX
+
+    loop i = 1..self.n_iterations
+
+        matrix correlations = mcorr(rX)[2:, 1]
+        scalar pos = imaxc(abs(correlations))
+        pos
+        scalar rho = correlations[pos]
+
+        scalar delta = self.eta * rho   # FIXME: or <sgn(rho)>?
+
+        scalar col = (i > 1) ? i-1 : 1
+        self.betas[pos, i] = self.betas[pos, col] + delta
+
+        # update residuals
+        # implement stopping rule
+    endloop
+
+
+    matrix mplot = self.betas'
+    mplot
+    gnuplot 1 2 --with-lines --time-series --matrix=mplot --output="display"
+        stop
+
+
+
+end function
