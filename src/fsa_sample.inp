@@ -5,6 +5,7 @@ clear
 
 set workdir "/home/at/git/forward_stagewise"
 
+include string_utils.gfn
 include "./src/fsa.inp" --force
 
 scalar runEX = 1		# select an example
@@ -59,10 +60,14 @@ bundle opts = null
 
 # Run training and evaluation using cross-validation
 #====================================================
-bundle b_ridge = fsa(LHS, RHS, opts)
+bundle B = fsa(LHS, RHS, opts)
+print B
 
-# Plot loss as a function of lambda
-#plot_loss(&b_ridge)
+plot_rho_values(B, TRUE)
+stop
+
+# Plot coefficient paths
+plot_coefficient_paths(B, FALSE)
 
 # Plot solution path
 #plot_beta(&b_ridge)
