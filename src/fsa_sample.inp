@@ -9,7 +9,7 @@ include string_utils.gfn
 #include ridge.gfn           # min. v1.11
 include "./src/fsa.inp" --force
 
-scalar runEX = 1		# select an example
+scalar runEX = 3		# select an example
 
 # specify some penalty values
 # TODO: let's do the following within the function:
@@ -41,10 +41,10 @@ elif runEX==2
 
 elif runEX==3
     # SIMULATION
-    nulldata 100
+    nulldata 500
     #set seed 1234
     setobs 1 1 --time-series
-    scalar k = 50
+    scalar k = 35
     series e = normal()
     series LHS = 1
     series LHS = 4.5 + 0.8*LHS(-1) - 0.4*LHS(-2) + e
@@ -53,6 +53,8 @@ elif runEX==3
     loop i=1..cols(X) -q
         RHS += genseries(sprintf("S%d", $i), X[,i])
     endloop
+
+    ols LHS RHS
 endif
 
 # run the main function with default values
@@ -62,16 +64,15 @@ bundle opts = null
 bundle B = fsa(LHS, RHS, opts)
 print B
 
-#stop
+print_estimation_results(B)
 
 # Retrieve point estimates
 eval B.coeff            # retrieve point estimates of all variables
 eval B.coeff_nonzero    # retrieve point estimates of selected variables
-stop
 
 # Plot correlations as a function of iterations
-#plot_rho_values(B)
+plot_rho_values(B)
 
 # Plot coefficient paths
-plot_coefficient_paths(B)
+#plot_coefficient_paths(B)
 
