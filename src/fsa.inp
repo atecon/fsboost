@@ -5,8 +5,8 @@ function bundle default_fsa_opts (const series y,
     bundle self = null
     scalar self.verbose = 1
     scalar self.eta = 0.001         # kind of learning rate
-    scalar self.n_iterations = 500
-    scalar self.threshold_correlation = 0.05    # min. (absolute) correlation needed before early stopping
+    scalar self.n_iterations = 5000
+    scalar self.threshold_correlation = 0.01    # min. (absolute) correlation needed before early stopping
 
     return self
 end function
@@ -29,7 +29,11 @@ function bundle fsa (series y "Dep. variable",
 
     /* Main function */
 
-    smpl y X --no-missing         # TODO: impacts on initial_residuals
+    if $datatype == 1
+        smpl --no-missing y X
+    elif $datatype == 2
+        smpl --contiguous y X
+    endif
 
     bundle self = default_fsa_opts(y, X)
     if exists(opts)
@@ -38,14 +42,15 @@ function bundle fsa (series y "Dep. variable",
 
 
     # Initilizations
+    scalar resid_mean = 0
+    scalar self.T = $nobs
     series self.y = y
-    list self.X = X
+    #list self.X = X
     string self.ynames = argname(y)
     strings self.Xnames = varnames(X)
     list self.X_without_const = X - const
-    scalar self.with_constant = nelem(self.X_without_const) < nelem(self.X) ? TRUE : FALSE
-    strings self.Xnames = (self.with_constant == TRUE) ? strdrop(self.Xnames, "const") : self.Xnames
-
+    scalar self.with_constant = nelem(self.X_without_const) < nelem(X) ? TRUE : FALSE
+    strings self.Xnames_wo_constant = (self.with_constant == TRUE) ? strdrop(self.Xnames, "const") : self.Xnames
 
     stdize_y_and_x(&self)
 
@@ -57,12 +62,87 @@ function bundle fsa (series y "Dep. variable",
     fsa_estimator(&self)
 
     # postprocessing
-    cnameset(self.betas, self.Xnames)
-    self.betas = cum(self.betas)
-    self.betas = self.betas[1:self.last_iteration, ]
     self.rho_values = self.rho_values[1:self.last_iteration]
+    cumsum_coefficient_paths(&self)
+
+    matrix self.coeff = get_rescaled_coeffs(self)
+
+    # Handle intercept
+    matrix resids = get_residuals(self.my, self.mX, self.coeff)
+    if self.with_constant
+        scalar resid_mean = meanc(resids)
+        self.coeff = resid_mean | self.coeff
+    endif
+    matrix self.coeff_nonzero = get_nonzero_rescaled_coeffs(self)
+
+    # attach variable names to coefficient vector
+    attach_coefficient_row_labels(&self)
+
+    # FIXME: I could not found how to determine the degrees of freedom for fsa estimator
+    scalar self.num_parameters = rows(vec(self.coeff_nonzero))
+
+    matrix resids_demeaned = resids - resid_mean
+
+    # Compute r-square
+    matrix y_pred = get_y_pred({X}, self.coeff)  # consider const if present
+    matrix r_squares = r2_stats(self.my, y_pred, self.num_parameters)
+    self.r2_qcorr] = r_squares[1]
+    # self.r2_qcorr_adj = r_squares[2]          # depends on self.num_parameters
+    self.r2_scores = r_squares[3]
+
+
+    cleanup_bundle(&self)
 
     return self
+end function
+
+
+function void cleanup_bundle (bundle *self)
+    /* Drop unnecessary stuff from bundle */
+
+    delete self.Xsd
+    delete self.ysd
+    delete self.mX
+    delete self.num_parameters
+    delete self.X_without_const
+end function
+
+function void attach_coefficient_row_labels (bundle *self)
+    /* Attach row labels to vector of point estimates. */
+
+    if self.with_constant
+        S = defarray("const") + get_names_of_nonzero_coeffs(self)
+    else
+        S = get_names_of_nonzero_coeffs(self)
+    endif
+    rnameset(self.coeff_nonzero, S)
+    rnameset(self.coeff, self.Xnames)
+end function
+
+
+function void cumsum_coefficient_paths (bundle *self)
+    /* Cumulate iterative coefficient estimates, restrict vector length and attach column labels for each regressor (needed for optional plotting. */
+
+    self.betas = cum(self.betas[1:self.last_iteration,])
+    cnameset(self.betas, self.Xnames_wo_constant)
+end function
+
+
+function matrix get_rescaled_coeffs (const bundle self)
+    /* Retrieve all final point estimates and rescale. */
+
+    return self.betas[self.last_iteration,]' .* (self.ysd ./ self.Xsd')
+end function
+
+
+
+function matrix get_nonzero_rescaled_coeffs (const bundle self)
+    /* Retrieve final non-zero point estimates. */
+
+    matrix bhat_all = self.coeff
+    matrix mask = (self.coeff .!= 0)
+
+    return selifr(self.coeff, mask)
 end function
 
 
@@ -104,7 +184,7 @@ function void print_early_stopping_reached (const bundle self,
     /* */
 
     if self.verbose > 0
-        printf "\nInfo: Correlation abs(%g) is lower than minimum required (%g) at iteration % out of %d.\n", abs(rho), self.threshold_correlation, iteration, self.n_iterations
+        printf "\nInfo: Correlation abs(%g) is lower than minimum required (%g) at iteration %d out of %d.\n", abs(rho), self.threshold_correlation, iteration, self.n_iterations
     endif
 end function
 
@@ -138,7 +218,7 @@ function void fsa_estimator (bundle *self)
         self.betas[i, position] = update_beta(self.betas[i, position], delta)
         yX[,1] = update_residuals(yX[,1], delta, self.mX[, position])
 
-        if abs(self.rho_values) < self.threshold_correlation
+        if abs(self.rho_values[i]) < self.threshold_correlation
             print_early_stopping_reached(self, abs(self.rho_values[i]), $i)
             break
         endif
@@ -158,24 +238,23 @@ function void plot_coefficient_paths (bundle self, const bool ylog_scale[0])
     matrix mplot = self.betas
     cnameset(mplot, self.Xnames)
 
-
     plot mplot
-        options with-lp time-series single-yaxis @ylog_scale_str
+       options with-lines time-series single-yaxis @ylog_scale_str
        #literal set linetype 3 lc rgb "#0000ff"
        #literal set nokey
        literal set grid
        printf "set title \"%s\" font \", %d\"", self.coeffplot_title, self.coeffplot_fontsize
-       printf "set xlabel 'Iteration' font \", %d\"", self.coeffplot_fontsize
+       printf "set xlabel 'Iterations' font \", %d\"", self.coeffplot_fontsize
        printf "set ylabel '%s' font \", %d\"", self.ylabel, self.coeffplot_fontsize
    end plot --output="@coeffplot_filename"
 end function
 
 
-function void plot_rho_values (bundle self, const bool absolute_values[0])
+function void plot_rho_values (bundle self, const bool absolute_values[1])
     /* Plot correlation coefficients. */
 
     string self.rhoplot_title = "Forward stagewise correlation values"
-    string self.ylabel = ""
+    string self.ylabel = (absolute_values == FALSE) ? "Correlations w. residuals" : "Absol. correlations w. residuals"
     scalar self.rhoplot_fontsize = 12
     string self.rhoplot_filename = "display"
     string filename = self.rhoplot_filename
@@ -184,20 +263,154 @@ function void plot_rho_values (bundle self, const bool absolute_values[0])
 
     plot mplot
        options with-lines time-series
+       literal set linetype 1 lc rgb "black" lw 1.5
        literal set nokey
        literal set grid
        printf "set title \"%s\" font \", %d\"", self.rhoplot_title, self.rhoplot_fontsize
-       printf "set xlabel 'Iteration' font \", %d\"", self.rhoplot_fontsize
-       #printf "set ylabel '%s' font \", %d\"", self.ylabel, self.rhoplot_fontsize
+       printf "set xlabel 'Iterations' font \", %d\"", self.rhoplot_fontsize
+       printf "set ylabel '%s' font \", %d\"", self.ylabel, self.rhoplot_fontsize
    end plot --output="@filename"
 end function
 
 
-/*
-# TODO:
-add UDFS for plotting
-#gnuplot 1 --with-lines --time-series --matrix=rho_values --output="display"
+function strings get_names_of_nonzero_coeffs (const bundle self)
+    /* Retrieve names variables for which point estimates are non-zero. */
 
-*/
+    matrix bhat_all = vec(self.betas[self.last_iteration,])
+
+    scalar n_nonzero_vars = sum(bhat_all .!= 0)
+    strings selected_vars = array(n_nonzero_vars)
+
+    scalar counter = 1
+    loop i = 1..rows(bhat_all)
+        if bhat_all[i] != 0
+            selected_vars[counter] = self.Xnames_wo_constant[i]
+            counter++
+        endif
+    endloop
+
+    return selected_vars
+end function
 
 
+function void print_estimation_results (bundle b,
+                                   int verbosity[0:2:1])
+    /* Print ridge results.
+    It doesn't make much sense to call this function with verbosity==0, but it's possible.
+    */
+    strings extralbl = defarray("Penalty", "Resid SD", "G-CV", "Eff. num params", "R^2", "R^2 (adj)", "R^2 score", "AIC", "BIC")
+    strings lbl = varnames(b.Xreorder) + extralbl
+    if verbosity == 2
+        print "Ridge regression results (with details)"
+        loop i = 1 .. b.n_lambdas -q
+            matrix cmat = b.betas[,i] ~ (b.betas[,i] ./ b.tstats[,i])
+            matrix extra = b.lambdas[i] | sqrt(b.s2s[i]) | b.gcv[i] | b.num_parameters[i] | b.r2_qcorr[i] | b.r2_qcorr_adj[i] | b.r2_scores[i] | b.aic[i] | b.bic[i]
+            modprint cmat lbl extra
+        endloop
+    elif verbosity == 1
+        print "Ridge regression results (summary)"
+        matrix m = (b.lambdas ~ sqrt(b.s2s) ~ b.gcv ~ b.num_parameters ~ b.r2_qcorr ~ b.r2_qcorr_adj ~ b.r2_scores ~ b.aic ~ b.bic)'
+        rnameset(m, extralbl)
+        print m
+    endif
+end function
+
+
+
+############ TODO: DROP LATER
+function matrix get_y_pred (const matrix mX,
+                            const matrix bhat)
+    /* Helper function for computing fitted values*/
+    return mX * bhat
+end function
+
+function matrix get_residuals (const matrix my,
+                               const matrix mX,
+                               const matrix bhat)
+    /* Helper function for computing residuals */
+    return my - get_y_pred(mX, bhat)
+end function
+
+function scalar generalized_cv_stats (const matrix resids,
+                                      int N[1::] "Sample length",
+                                      scalar effective_num_of_params)
+    /* Compute generalized cross-validation statistics. */
+    return meanc( (resids / (1 - effective_num_of_params/N)).^2 )
+end function
+
+function matrix r2_stats (matrix y_true "T by 1 vector of realizations",
+                          matrix y_pred "T by 1 vector of estimated values",
+                          scalar num_parameters "No. of parameters")
+    /* Helper function for computing different R-square statistics. */
+
+    matrix y_true = vec(y_true)
+    matrix y_pred = vec(y_pred)
+    if rows(y_true) != rows(y_pred)
+        printf "\nError: Vectors y_true and y_pred are of different length.\n"
+        return NA
+    endif
+    if rows(y_pred) < 2
+        printf "\nError: R^2 score not well-defined with less than two samples.\n"
+        return NA
+    endif
+    if isconst(y_true)
+        printf "\nError: Vector y_true is constant.\n"
+        return NA
+    endif
+    matrix R = NA * zeros(3,1)
+    R[1] = r2_qcorr(&y_true, &y_pred)
+    R[2] = r2_qcorr_adjusted(R[1], rows(y_true), num_parameters)
+    R[3] = r2_score(&y_true, &y_pred)
+    rnameset(R, "r2_qcorr r2_qcorr_adj r2_score")
+    return R
+end function
+
+function scalar r2_qcorr (const matrix *y_true,
+                          const matrix *y_pred)
+    /* R-square based on quadratic correlation. */
+    return corr(y_true, y_pred)^2
+end function
+
+function scalar r2_qcorr_adjusted (scalar r2 "R-square from r2_qcorr()",
+                                   int n "Sample length",
+                                   scalar num_parameters "No. of ridge parameters used")
+    /* Adjusted R-square based on quadratic correlation */
+    nominator = n - 1
+    denominator = n - num_parameters - 1
+    return 1 - (1-r2) * nominator/denominator
+end function
+
+function scalar r2_score (const matrix *y_true,
+                          const matrix *y_pred "Must contain constant (bias) if present")
+    /* R^2 (coefficient of determination) regression score function.
+    Best possible score is 1.0 and it can be negative (because the
+    model can be arbitrarily worse). A constant model that always
+    predicts the expected value of y, disregarding the input features, would get a R^2 score of 0.0.
+    Notes
+    -----
+    This is not a symmetric function.
+    Unlike most other scores, R^2 score may be negative (it need not
+    actually be the square of a quantity R).
+    This metric is not well-defined for single samples and will return
+    a NaN value if n_samples is less than two.
+    References
+    ----------
+    <https://github.com/scikit-learn/scikit-learn/blob/
+    1495f69242646d239d89a5713982946b8ffcf9d9/
+    sklearn/metrics/regression.py#L449>
+    `Wikipedia entry on the Coefficient of determination
+    <https://en.wikipedia.org/wiki/Coefficient_of_determination>`
+    */
+    # Initialize check values
+    nonzero_denominator = 0
+    nonzero_numerator = 0
+    valid_score = 0
+    # Compute statistics
+    scalar numerator = sumc( (y_true-y_pred).^2)
+    scalar denominator = sumc( (y_true-mean(y_true)).^2 )
+    nonzero_denominator = (denominator != 0) ? 1 : nonzero_denominator
+    nonzero_numerator = (numerator!=0) ? 1 : nonzero_numerator
+    valid_score = (nonzero_denominator && nonzero_numerator) ? 1 : valid_score
+    output_scores = 1
+    return (valid_score) ? (1 - numerator/denominator) : output_scores
+end function
