@@ -7,17 +7,9 @@ set workdir "/home/at/git/forward_stagewise"
 
 include string_utils.gfn
 #include ridge.gfn           # min. v1.11
-include "./src/fsa.inp" --force
+include "./src/fsreg.inp" --force
 
-scalar runEX = 3		# select an example
-
-# specify some penalty values
-# TODO: let's do the following within the function:
-/* If the user doesn't specify lambda or nlambda,
- we set nlambda=100 and lmax=400
- In glmnet() a pre-check is ran: set lmax
- there where most coefficients are 'close to zero'
-*/
+scalar runEX = 1		# select an example
 
 # Select an example
 if runEX==1
@@ -30,19 +22,9 @@ if runEX==1
     ols LHS RHS
 
 elif runEX==2
-    # Dataset from glmnet
-    open "@wd/glmnet_QSE.csv" --quiet  --preserve
-    setobs 1 1 --special-time-series
-    setobs 1 1 --cross-section
-
-    rename X1 LHS
-    list RHS = const dataset
-    RHS -= LHS
-
-elif runEX==3
     # SIMULATION
-    nulldata 500
-    #set seed 1234
+    nulldata 750
+    set seed 1234
     setobs 1 1 --time-series
     scalar k = 35
     series e = normal()
@@ -59,12 +41,18 @@ endif
 
 # run the main function with default values
 bundle opts = null
+scalar opts.verbose = 1
+scalar opts.eta = 0.05                  # learning rate
+scalar opts.max_num_iterations = 5000  # max. number of boosting rounds
+scalar opts.early_stopping_rounds = 30 # stop if no improvement after n rounds
+
 
 # Run estimation
-bundle B = fsa(LHS, RHS, opts)
+bundle B = fsreg(LHS, RHS, opts)
 print B
 
-print_estimation_results(B)
+# Print estimation results
+print_fsreg_results(B)
 
 # Retrieve point estimates
 eval B.coeff            # retrieve point estimates of all variables
@@ -74,5 +62,5 @@ eval B.coeff_nonzero    # retrieve point estimates of selected variables
 plot_rho_values(B)
 
 # Plot coefficient paths
-#plot_coefficient_paths(B)
+plot_coefficient_paths(B)
 
