@@ -40,6 +40,37 @@ function void initialize (bundle *self, const series y, const list X)
 end function
 
 
+function bundle fsreg_gui (const series y "Dep. variable",
+                           const list X "Candidates",
+                           const scalar eta[0.0001:0.9999:0.05] "Learning rate",
+                           const int max_num_iterations[20::2000] "Max. number of iterations",
+                           const int early_stopping_rounds[10::30] "Early stopping rounds",
+                           const bool plot_coefficient_paths[0] "Plot coefficient paths",
+                           const bool plot_rho_values[0] "Plot correlation w. residuals",
+                           const int verbose[0:2:1] "Print details" {"quiet", "details", "more details"})
+    /* GUI wrapper for fsreg(). */
+
+    bundle model = null
+    scalar model.verbose = verbose
+    scalar model.eta = eta
+    scalar model.max_num_iterations = max_num_iterations
+    scalar model.early_stopping_rounds = early_stopping_rounds
+
+    bundle model = fsreg(y, X, model)
+    print_fsreg_results(model)
+
+    if plot_rho_values == TRUE
+        plot_rho_values(model)
+    endif
+
+    if plot_coefficient_paths == TRUE
+        plot_coefficient_paths(model)
+    endif
+
+    return model
+end function
+
+
 function bundle fsreg (const series y "Dep. variable",
                        const list X "Candidates",
                        bundle opts[null])
@@ -91,9 +122,8 @@ function bundle fsreg (const series y "Dep. variable",
     matrix y_pred = get_y_pred({X}, self.coeff)  # consider const if present
     matrix r_squares = r2_stats(self.my, y_pred, self.num_parameters)
     self.r2_qcorr] = r_squares[1]
-    # self.r2_qcorr_adj = r_squares[2]          # depends on self.num_parameters
-    self.r2_scores = r_squares[3]
-
+    #self.r2_qcorr_adj = r_squares[2]          # depends on self.num_parameters
+    #self.r2_scores = r_squares[3]
 
     cleanup_bundle(&self)
 
@@ -198,7 +228,7 @@ function void print_early_stopping_reached (const bundle self)
     /* */
 
     if self.verbose > 0
-        printf "\nInfo: No improvement in correlation for the last %d iterations. Early stopping applies.\n", self.early_stopping_rounds
+        printf "\nInfo: No improvement in correlation for the last %d iterations.\n Early stopping applies.\n", self.early_stopping_rounds
     endif
 end function
 
@@ -318,8 +348,9 @@ function void print_fsreg_results (bundle self)
     /* Print results. */
 
     if self.verbose
-        print "Forward-stagewise regression results (no inference)"
-        strings label_str = defarray("const") + get_names_of_nonzero_coeffs(self) + defarray("Number of iterations", "Correl. w. residuals", "S.E. of regression", "R-squared", "R-sq. score")
+        printf "\nForward-stagewise regression results (no inference)"
+        printf "\n-------------------------------------------------------\n"
+        strings label_str = defarray("const") + get_names_of_nonzero_coeffs(self) + defarray("Number of iterations", "Correl. w. residuals", "S.E. of regression", "R-squared")
         matrix extra = self.actual_num_iterations |self.rho_values[self.actual_num_iterations] | sqrt(self.s2s) | self.r2_qcorr
         scalar k = rows(self.coeff_nonzero)
         matrix bhat = self.coeff_nonzero ~ mshape(NA, k, 1)
@@ -329,25 +360,25 @@ function void print_fsreg_results (bundle self)
 end function
 
 
-
+/*
 ############ TODO: DROP LATER
 function matrix get_y_pred (const matrix mX,
                             const matrix bhat)
-    /* Helper function for computing fitted values*/
+    # Helper function for computing fitted values
     return mX * bhat
 end function
 
 function matrix get_residuals (const matrix my,
                                const matrix mX,
                                const matrix bhat)
-    /* Helper function for computing residuals */
+    #/* Helper function for computing residuals
     return my - get_y_pred(mX, bhat)
 end function
 
 function matrix r2_stats (matrix y_true "T by 1 vector of realizations",
                           matrix y_pred "T by 1 vector of estimated values",
                           scalar num_parameters "No. of parameters")
-    /* Helper function for computing different R-square statistics. */
+    # Helper function for computing different R-square statistics.
 
     matrix R = NA * zeros(3,1)
     matrix y_true = vec(y_true)
@@ -376,14 +407,14 @@ end function
 
 function scalar r2_qcorr (const matrix *y_true,
                           const matrix *y_pred)
-    /* R-square based on quadratic correlation. */
+    # R-square based on quadratic correlation.
     return corr(y_true, y_pred)^2
 end function
 
 function scalar r2_qcorr_adjusted (scalar r2 "R-square from r2_qcorr()",
                                    int n "Sample length",
                                    scalar num_parameters "No. of ridge parameters used")
-    /* Adjusted R-square based on quadratic correlation */
+    # Adjusted R-square based on quadratic correlation
 
     scalar nominator = n - 1
     scalar denominator = n - num_parameters - 1
@@ -394,46 +425,8 @@ end function
 
 function scalar get_residuals_variance (const matrix resids,
                                         const int T)
-    /* Helper function for computing the residuals' variance */
+    # Helper function for computing the residuals' variance
     return resids'resids / T
 end function
 
-
-function scalar r2_score (const matrix *y_true,
-                          const matrix *y_pred)
-    /* R^2 (coefficient of determination) regression score function.
-    Best possible score is 1.0 and it can be negative (because the
-    model can be arbitrarily worse). A constant model that always
-    predicts the expected value of y, disregarding the input features, would get a R^2 score of 0.0.
-    Notes
-    -----
-    This is not a symmetric function.
-    Unlike most other scores, R^2 score may be negative (it need not
-    actually be the square of a quantity R).
-    This metric is not well-defined for single samples and will return
-    a NaN value if n_samples is less than two.
-    References
-    ----------
-    <https://github.com/scikit-learn/scikit-learn/blob/
-    1495f69242646d239d89a5713982946b8ffcf9d9/
-    sklearn/metrics/regression.py#L449>
-    `Wikipedia entry on the Coefficient of determination
-    <https://en.wikipedia.org/wiki/Coefficient_of_determination>`
-    */
-
-    # Initialize check values
-    nonzero_denominator = 0
-    nonzero_numerator = 0
-    valid_score = 0
-
-    # Compute statistics
-    scalar numerator = sumc( (y_true-y_pred).^2)
-    scalar denominator = sumc( (y_true-mean(y_true)).^2 )
-    nonzero_denominator = (denominator != 0) ? 1 : nonzero_denominator
-    nonzero_numerator = (numerator!=0) ? 1 : nonzero_numerator
-    valid_score = (nonzero_denominator && nonzero_numerator) ? 1 : valid_score
-    output_scores = 1
-
-    return (valid_score) ? (1 - numerator/denominator) : output_scores
-end function
-
+*/

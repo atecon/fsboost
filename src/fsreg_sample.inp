@@ -1,13 +1,12 @@
 set verbose off
 clear
 
-#include ridge.gfn --force
+#set workdir "/home/at/git/fsreg"
 
-set workdir "/home/at/git/forward_stagewise"
-
-include string_utils.gfn
+include fsreg.gfn
+#include string_utils.gfn
 #include ridge.gfn           # min. v1.11
-include "./src/fsreg.inp" --force
+#include "./src/fsreg.inp" --force
 
 scalar runEX = 1		# select an example
 
@@ -49,13 +48,14 @@ scalar opts.early_stopping_rounds = 30 # stop if no improvement after n rounds
 
 # Run estimation
 bundle B = fsreg(LHS, RHS, opts)
-print B
+
+print B                 # print bundle items
 
 # Print estimation results
 print_fsreg_results(B)
 
 # Retrieve point estimates
-eval B.coeff            # retrieve point estimates of all variables
+#eval B.coeff            # retrieve point estimates of all variables
 eval B.coeff_nonzero    # retrieve point estimates of selected variables
 
 # Plot correlations as a function of iterations
