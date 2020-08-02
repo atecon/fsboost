@@ -1,26 +1,19 @@
 set verbose off
 clear
-
-#set workdir "/home/at/git/fsreg"
-
 include fsreg.gfn
-#include string_utils.gfn
-#include ridge.gfn           # min. v1.11
-#include "./src/fsreg.inp" --force
 
-scalar runEX = 1		# select an example
+
+scalar runEX = 3		# select an example
 
 # Select an example
-if runEX==1
-    open australia.gdt -q --preserve
+if runEX == 1
+    open australia.gdt -q -p    # time-series data set
 
     # define the variables
     series LHS = ldiff(PAU)
     list RHS = const LHS(-1 to -2) IUS(-1 to -2)  IAU(-1 to -2)
 
-    ols LHS RHS
-
-elif runEX==2
+elif runEX == 2
     # SIMULATION
     nulldata 750
     set seed 1234
@@ -35,28 +28,35 @@ elif runEX==2
         RHS += genseries(sprintf("S%d", $i), X[,i])
     endloop
 
-    ols LHS RHS
+elif runEX == 3
+    open mroz.gdt -q -p     # cross-sectional data set
+    series LHS = wage
+    list RHS = const dataset
+
+    RHS -= LHS wage     # drop lhs varianle
 endif
 
-# run the main function with default values
-bundle opts = null
-scalar opts.verbose = 1
-scalar opts.eta = 0.05                  # learning rate
-scalar opts.max_num_iterations = 5000  # max. number of boosting rounds
-scalar opts.early_stopping_rounds = 30 # stop if no improvement after n rounds
+# Run standard OLS as benchmark
+ols LHS RHS
+
 
 
 # Run estimation
-bundle B = fsreg(LHS, RHS, opts)
+bundle B = fsreg(LHS, RHS)
 
-print B                 # print bundle items
+print_fsreg_results(B)      # Print estimation results
 
-# Print estimation results
-print_fsreg_results(B)
+list X_final = B.X_final    # Retrieve list of selected regressors
+X_final
 
 # Retrieve point estimates
-#eval B.coeff            # retrieve point estimates of all variables
+eval B.coeff            # retrieve point estimates of all variables
 eval B.coeff_nonzero    # retrieve point estimates of selected variables
+
+series yhat = B.yhat    # Retrieve fitted values
+
+# Plot realizations vs. fitted values
+gnuplot LHS yhat --output="display"
 
 # Plot correlations as a function of iterations
 plot_rho_values(B)
@@ -64,3 +64,16 @@ plot_rho_values(B)
 # Plot coefficient paths
 plot_coefficient_paths(B)
 
+
+/* Activate if wished
+# Define own parameter set
+bundle opts = null
+scalar opts.verbose = 1
+scalar opts.eta = 0.001                  # learning rate
+scalar opts.max_num_iterations = 5000   # max. number of boosting rounds
+scalar opts.early_stopping_rounds = 20  # stop if no improvement after n rounds
+
+# Run estimation
+bundle B = fsreg(LHS, RHS, opts)
+print_fsreg_results(B)      # Print estimation results
+*/

@@ -5,8 +5,8 @@ function bundle default_fsreg_opts (const series y,
     bundle self = null
     scalar self.verbose = 1
     scalar self.eta = 0.05         # kind of learning rate
-    scalar self.max_num_iterations = 2000
-    scalar self.early_stopping_rounds = 10
+    scalar self.max_num_iterations = 10000
+    scalar self.early_stopping_rounds = 50
 
     return self
 end function
@@ -89,45 +89,70 @@ function bundle fsreg (const series y "Dep. variable",
     endif
 
     # Initilizations
-    string self.ynames = argname(y)
+    string self.yname = argname(y)
     strings self.Xnames = varnames(X)
     initialize(&self, y, X)
 
     stdize_y_and_x(&self)
-
     fsreg_estimator(&self)
-
     post_process(&self)
 
     # Handle intercept: non-scaled as "coeff" is already re-scaled
     matrix resids = get_residuals({y}, {self.X_without_const}, self.coeff)
-    #gnuplot 1 --matrix=resids --with-lines --time-series --output=display
-
     if self.with_constant
         scalar self.resid_mean = meanc(resids)
         self.coeff = self.resid_mean | self.coeff
     endif
     matrix self.coeff_nonzero = get_nonzero_rescaled_coeffs(self)
-    scalar self.s2s = get_residuals_variance(cdemean(resids), self.T)
 
-    # attach variable names to coefficient vector
     attach_coefficient_row_labels(&self)
 
     # FIXME: I could not found how to determine the degrees of freedom for fsreg estimator
     scalar self.num_parameters = rows(vec(self.coeff_nonzero))
 
-    matrix resids_demeaned = resids - self.resid_mean
+    add_yhat_and_uhat_to_bundle(y, X, &self)
+    scalar self.uhat_variance = sd(self.uhat)
+    compute_r_squares(&self)
 
-    # Compute r-square
-    matrix y_pred = get_y_pred({X}, self.coeff)  # consider const if present
-    matrix r_squares = r2_stats(self.my, y_pred, self.num_parameters)
-    self.r2_qcorr] = r_squares[1]
-    #self.r2_qcorr_adj = r_squares[2]          # depends on self.num_parameters
-    #self.r2_scores = r_squares[3]
+    list self.X_final = add_selected_predictors_to_list(X, self)
 
     cleanup_bundle(&self)
 
     return self
+end function
+
+
+function list add_selected_predictors_to_list (const list X, const bundle self)
+    /* Add selected preditors to list. */
+
+    list L = (self.with_constant == TRUE) ? const : null
+    S = get_names_of_nonzero_coeffs(self)
+
+    loop foreach i S
+        list L += genseries("$i", X.$i)
+    endloop
+
+    return L
+end function
+
+
+function void add_yhat_and_uhat_to_bundle (const series y,
+                                            const list X,
+                                            bundle *self)
+    /* Add final fitted values and residuals to bundle. */
+
+    series self.yhat = get_y_pred({X}, self.coeff)  # considering "const" if
+    series self.uhat = y - self.yhat
+end function
+
+
+function void compute_r_squares (bundle *self)
+    /* Wrapper calling functions for computing R^2. Currently, we only know that stuff is statistically correct for statistics "r2_qcorr". */
+
+    matrix r_squares = r2_stats(self.my, {self.yhat}, self.num_parameters)
+    self.r2_qcorr = r_squares[1]
+    #self.r2_qcorr_adj = r_squares[2]          # depends on self.num_parameters
+    #self.r2_scores = r_squares[3]
 end function
 
 
@@ -137,9 +162,13 @@ function void cleanup_bundle (bundle *self)
     delete self.Xsd
     delete self.ysd
     delete self.mX
+    delete self.y
+    delete self.my
     delete self.num_parameters
     delete self.X_without_const
+    delete self.resid_mean
 end function
+
 
 function void attach_coefficient_row_labels (bundle *self)
     /* Attach row labels to vector of point estimates. */
@@ -153,6 +182,7 @@ function void attach_coefficient_row_labels (bundle *self)
     rnameset(self.coeff, self.Xnames)
 end function
 
+
 function void post_process (bundle *self)
     /* Wrapper for some post-processing. */
 
@@ -161,12 +191,14 @@ function void post_process (bundle *self)
     matrix self.coeff = get_rescaled_coeffs(self)
 end function
 
+
 function void cumsum_coefficient_paths (bundle *self)
     /* Cumulate iterative coefficient estimates, restrict vector length and attach column labels for each regressor (needed for optional plotting. */
 
     self.betas = cum(self.betas[1:self.actual_num_iterations,])
     cnameset(self.betas, self.Xnames_wo_constant)
 end function
+
 
 function void get_valid_rho_values (bundle *self)
     /* Restrict vector to length equal to the number of actual iterations. */
@@ -276,14 +308,15 @@ function void fsreg_estimator (bundle *self)
 end function
 
 
-function void plot_coefficient_paths (bundle self, const bool ylog_scale[0])
+function void plot_coefficient_paths (bundle self,
+                                    string filename[null] "Path + filename to store figure",
+                                    const bool ylog_scale[0])
     /* Plot coefficient paths. */
 
-    string self.coeffplot_title = "Forward stagewise coefficient paths"
-    string self.ylabel = (ylog_scale == FALSE) ? "Standardized coefficients" : "Standardized coefficients (in logarithms)"
-    scalar self.coeffplot_fontsize = 12
-    string self.coeffplot_filename = "display"
-    string filename = self.coeffplot_filename
+    string title = "Forward stagewise coefficient paths"
+    string ylabel = (ylog_scale == FALSE) ? "Standardized coefficients" : "Standardized coefficients (in logarithms)"
+    scalar fontsize = 12
+    string filename = (exists(filename)) ? filename : "display"
     string ylog_scale_str = (ylog_scale == TRUE) ? "--ylogscale=10" : ""
     matrix mplot = self.betas
     cnameset(mplot, self.Xnames)
@@ -293,23 +326,23 @@ function void plot_coefficient_paths (bundle self, const bool ylog_scale[0])
        #literal set linetype 3 lc rgb "#0000ff"
        #literal set nokey
        literal set grid
-       printf "set title \"%s\" font \", %d\"", self.coeffplot_title, self.coeffplot_fontsize
-       printf "set xlabel 'Iterations' font \", %d\"", self.coeffplot_fontsize
-       printf "set ylabel '%s' font \", %d\"", self.ylabel, self.coeffplot_fontsize
+       printf "set title \"%s\" font \", %d\"", title, fontsize
+       printf "set xlabel 'Iterations' font \", %d\"", fontsize
+       printf "set ylabel '%s' font \", %d\"", ylabel, fontsize
        printf "set yrange[%g:%g]", min(mplot)*1.1, max(mplot)*1.1
    end plot --output="@filename"
 end function
 
 
-function void plot_rho_values (bundle self, const bool absolute_values[1])
+function void plot_rho_values (bundle self,
+                                string filename[null] "Path + filename to store figure",
+                                const bool absolute_values[1])
     /* Plot correlation coefficients. */
 
-    string self.rhoplot_title = "Forward stagewise correlation values"
-    string self.ylabel = (absolute_values == FALSE) ? "Correlations w. residuals" : "Absol. correlations w. residuals"
-    scalar self.rhoplot_fontsize = 12
-    string self.rhoplot_filename = "display"
-    string filename = self.rhoplot_filename
-
+    string title = "Forward stagewise correlation values"
+    string ylabel = (absolute_values == FALSE) ? "Correlations w. residuals" : "Absol. correlations w. residuals"
+    scalar fontsize = 12
+    string filename = (exists(filename)) ? filename : "display"
     matrix mplot = (absolute_values == TRUE) ? abs(self.rho_values) : self.rho_values
 
     plot mplot
@@ -317,9 +350,9 @@ function void plot_rho_values (bundle self, const bool absolute_values[1])
        literal set linetype 1 lc rgb "black" lw 1.5
        literal set nokey
        literal set grid
-       printf "set title \"%s\" font \", %d\"", self.rhoplot_title, self.rhoplot_fontsize
-       printf "set xlabel 'Iterations' font \", %d\"", self.rhoplot_fontsize
-       printf "set ylabel '%s' font \", %d\"", self.ylabel, self.rhoplot_fontsize
+       printf "set title \"%s\" font \", %d\"", title, fontsize
+       printf "set xlabel 'Iterations' font \", %d\"", fontsize
+       printf "set ylabel '%s' font \", %d\"", ylabel, fontsize
    end plot --output="@filename"
 end function
 
@@ -351,7 +384,7 @@ function void print_fsreg_results (bundle self)
         printf "\nForward-stagewise regression results (no inference)"
         printf "\n-------------------------------------------------------\n"
         strings label_str = defarray("const") + get_names_of_nonzero_coeffs(self) + defarray("Number of iterations", "Correl. w. residuals", "S.E. of regression", "R-squared")
-        matrix extra = self.actual_num_iterations |self.rho_values[self.actual_num_iterations] | sqrt(self.s2s) | self.r2_qcorr
+        matrix extra = self.actual_num_iterations |self.rho_values[self.actual_num_iterations] | sd(self.uhat) | self.r2_qcorr
         scalar k = rows(self.coeff_nonzero)
         matrix bhat = self.coeff_nonzero ~ mshape(NA, k, 1)
 

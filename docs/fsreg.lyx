@@ -1,0 +1,2503 @@
+#LyX 2.3 created this file. For more info see http://www.lyx.org/
+\lyxformat 544
+\begin_document
+\begin_header
+\save_transient_properties true
+\origin unavailable
+\textclass article
+\use_default_options true
+\maintain_unincluded_children false
+\language english
+\language_package babel
+\inputencoding auto
+\fontencoding global
+\font_roman "default" "default"
+\font_sans "default" "default"
+\font_typewriter "default" "default"
+\font_math "auto" "auto"
+\font_default_family default
+\use_non_tex_fonts false
+\font_sc false
+\font_osf false
+\font_sf_scale 100 100
+\font_tt_scale 100 100
+\use_microtype false
+\use_dash_ligatures true
+\graphics default
+\default_output_format default
+\output_sync 0
+\bibtex_command default
+\index_command default
+\paperfontsize 11
+\spacing other 1.15
+\use_hyperref false
+\papersize default
+\use_geometry true
+\use_package amsmath 1
+\use_package amssymb 1
+\use_package cancel 1
+\use_package esint 1
+\use_package mathdots 1
+\use_package mathtools 1
+\use_package mhchem 1
+\use_package stackrel 1
+\use_package stmaryrd 1
+\use_package undertilde 1
+\cite_engine basic
+\cite_engine_type default
+\biblio_style plain
+\use_bibtopic false
+\use_indices false
+\paperorientation portrait
+\suppress_date false
+\justification true
+\use_refstyle 1
+\use_minted 0
+\index Index
+\shortcut idx
+\color #008000
+\end_index
+\leftmargin 2.5cm
+\topmargin 2.5cm
+\rightmargin 2.5cm
+\bottommargin 2.5cm
+\secnumdepth 3
+\tocdepth 3
+\paragraph_separation indent
+\paragraph_indentation default
+\is_math_indent 0
+\math_numbering_side default
+\quotes_style english
+\dynamic_quotes 0
+\papercolumns 1
+\papersides 1
+\paperpagestyle default
+\listings_params "basicstyle={\footnotesize\ttfamily}"
+\tracking_changes false
+\output_changes false
+\html_math_output 0
+\html_css_as_file 0
+\html_be_strict false
+\end_header
+
+\begin_body
+
+\begin_layout Title
+The Gretl 
+\family typewriter
+fsreg
+\family default
+ function package for running the forward stagewise regression
+\end_layout
+
+\begin_layout Author
+\begin_inset CommandInset href
+LatexCommand href
+name "Artur Tarassow"
+target "atecon@posteo.de"
+type "mailto:"
+literal "false"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Date
+Version 0.1
+\end_layout
+
+\begin_layout Standard
+\begin_inset Box Doublebox
+position "t"
+hor_pos "c"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "100col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+
+\series bold
+\size footnotesize
+Changelog
+\end_layout
+
+\begin_layout Itemize
+
+\size footnotesize
+Version 0.1 (August, 2020)
+\end_layout
+
+\begin_deeper
+\begin_layout Itemize
+
+\size footnotesize
+initial release
+\end_layout
+
+\end_deeper
+\end_inset
+
+
+\begin_inset CommandInset toc
+LatexCommand tableofcontents
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Section
+Introduction
+\end_layout
+
+\begin_layout Standard
+Selecting the relevant predictors among a many potential ones is a crucial
+ task.
+ Neglecting relevant predictors may lead to inconsistent parameter estimates
+ while considering irrelevant regressors yields an inefficient estimator.
+ Furthermore, considering highly correlated predictors into a standard least
+ square regression most probably suffers from multicollinearity issues.
+ Lastly, standard least squares cannot handle the case when the number of
+ observations, 
+\begin_inset Formula $T$
+\end_inset
+
+, exceeds the number of potential regressors, 
+\begin_inset Formula $k$
+\end_inset
+
+.
+ 
+\end_layout
+
+\begin_layout Standard
+So called shrinkage and/ or selection estimators such as Ridge or Lasso
+ among others, are known to handle such issues.
+ Another estimation approach marks the so called forward stagewise regression
+ approach (FSREG henceforth).
+ FSREG follows a simple strategy for constructing a sequence of sparse regressio
+n estimates: Initially set all coefficients to zero, and iteratively update
+ the coefficient (by a small amount, depending on the 
+\emph on
+learning rate 
+\begin_inset Formula $\epsilon$
+\end_inset
+
+
+\emph default
+) of the variable that achieves the maximal absolute correlation with the
+ current residual.
+
+\emph on
+ Learning
+\emph default
+ from the residuals has some connection to Boosting.
+ However, this procedure also has some interesting connection to the Lasso
+ under some conditions (REFs).
+ As the step size goes to zero, the sequence of forward stagewise estimates
+ exactly coincides with the lasso path.
+ While, this equivalence holds outside of least squares regression, currently
+ we only support minimization of squared loss (RMSE).
+\end_layout
+
+\begin_layout Section
+The FSREG algorithm
+\end_layout
+
+\begin_layout Standard
+The FSREG algorithm works as follows:
+\begin_inset Foot
+status open
+
+\begin_layout Plain Layout
+Also note, that this is analogous to least squares boosting, with the number
+ of trees equal to the number of predictors predictors.
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Enumerate
+Start with 
+\begin_inset Formula $r=y$
+\end_inset
+
+ and 
+\begin_inset Formula $\beta_{1}=\beta_{2}=\ldots=\beta_{k}=0$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Enumerate
+Find the predictor 
+\begin_inset Formula $x_{j}$
+\end_inset
+
+ most correlated with 
+\begin_inset Formula $r$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Enumerate
+Update the 
+\begin_inset Formula $j$
+\end_inset
+
+-th predictor 
+\begin_inset Formula $\beta_{j}^{i}\leftarrow\beta_{j}^{i-1}+\delta_{j}$
+\end_inset
+
+ where 
+\begin_inset Formula $\delta_{j}=\epsilon\times\text{sign}<r^{i-1},x_{j}>$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Enumerate
+Update the residuals 
+\begin_inset Formula $r^{i}\leftarrow r^{i-1}-\delta_{j}\times x_{j}$
+\end_inset
+
+ and repeat steps 2 and 3 many times.
+\end_layout
+
+\begin_layout Standard
+Here 
+\begin_inset Formula $y$
+\end_inset
+
+, 
+\series bold
+
+\begin_inset Formula $\beta$
+\end_inset
+
+
+\series default
+, 
+\begin_inset Formula $\epsilon$
+\end_inset
+
+, 
+\begin_inset Formula $<r,x_{j}>$
+\end_inset
+
+ and 
+\begin_inset Formula $i$
+\end_inset
+
+ refer to the endogenous variable, the unknown regression coefficients,
+ the learning rate, the correlation between the current residuals and the
+ 
+\begin_inset Formula $j$
+\end_inset
+
+-th regressor and the 
+\begin_inset Formula $i$
+\end_inset
+
+-th iteration.
+ The learning rate 
+\begin_inset Formula $\epsilon$
+\end_inset
+
+ is a hyper-parameter and set to a fixed constant (e.g., 
+\begin_inset Formula $\epsilon=0.01$
+\end_inset
+
+).
+ The only computations intense task is to compute the correlation between
+ 
+\begin_inset Formula $r$
+\end_inset
+
+ and the all 
+\begin_inset Formula $k$
+\end_inset
+
+ predictors.
+ We make use of Gretl's 
+\family typewriter
+mcorr()
+\family default
+ function for this which is written in C and hence computation is very fast.
+\end_layout
+
+\begin_layout Standard
+The idea behind the stagewise updates is simple: at each iteration greedily
+ select the predictor 
+\begin_inset Formula $j$
+\end_inset
+
+ that has the largest absolute inner product (or correlation, for standardized
+ variables) with the residual.
+ As the residuals refer to the yet unexplained part of the model, we are
+ searching for any variable that still has some information content for
+ explaining 'something' left unexplained.
+\end_layout
+
+\begin_layout Standard
+Given the greediness that only a single predictor is selected each iteration,
+ updating the coefficient of variable 
+\begin_inset Formula $j$
+\end_inset
+
+ by a large amount is problematic.
+ Instead, the parameter 
+\begin_inset Formula $\text{\ensuremath{\epsilon}}$
+\end_inset
+
+ slows down the learning process only changing the coefficient by a tiny
+ amount.
+ Thus, many iterations are required to yield reasonable parameter estimates
+ among a large set of potential predictor variables.
+ Figure 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "fig:Coefficient-paths"
+plural "false"
+caps "false"
+noprefix "false"
+
+\end_inset
+
+ illustrates the coefficient path of the coefficient estimates over 2000
+ iterations.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+placement h
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename coeff_path.png
+	lyxscale 50
+	scale 50
+	rotateOrigin center
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+\begin_inset CommandInset label
+LatexCommand label
+name "fig:Coefficient-paths"
+
+\end_inset
+
+Coefficient paths
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Early stopping rules are important for two reasons: First, one tries to
+ avoid over-fitting, and second it may be unnecessary to run 
+\begin_inset Formula $\bar{N}$
+\end_inset
+
+ iterations if no improvement (in terms of model fit) can be seen after
+ 
+\begin_inset Formula $N\ll\bar{N}$
+\end_inset
+
+ iterations.
+ The implemented early stopping strategy checks the absolute correlation
+ 
+\begin_inset Formula $|<r,x_{j}^{i}>|$
+\end_inset
+
+: In case the absolute correlation does not improve for 
+\begin_inset Formula $n$
+\end_inset
+
+ (e.g., 
+\begin_inset Formula $n=30)$
+\end_inset
+
+ iterations, we assume that the coefficient estimates have converged and
+ stop the algorithm.
+ Figure 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "fig:Correlation-dynamics"
+plural "false"
+caps "false"
+noprefix "false"
+
+\end_inset
+
+ illustrates the development of the development of absolute correlation
+ between the residuals and the selected variables.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+placement h
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename correlation_path.png
+	lyxscale 50
+	scale 50
+
+\end_inset
+
+
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+\begin_inset CommandInset label
+LatexCommand label
+name "fig:Correlation-dynamics"
+
+\end_inset
+
+Correlation dynamics
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Section
+Install and load the package
+\end_layout
+
+\begin_layout Standard
+The 
+\family typewriter
+fsreg
+\family default
+ package is publicly available on the gretl server.
+ The package must be downloaded once, and loaded into memory each time gretl
+ is started.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Box Doublebox
+position "t"
+hor_pos "c"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "100col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+\begin_inset listings
+lstparams "basicstyle={\footnotesize\ttfamily}"
+inline false
+status open
+
+\begin_layout Plain Layout
+
+clear
+\end_layout
+
+\begin_layout Plain Layout
+
+set verbose off
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\begin_layout Plain Layout
+
+pkg install fsreg        # Download package (only once need)
+\end_layout
+
+\begin_layout Plain Layout
+
+include fsreg.gfn        # Load the package into memory
+\end_layout
+
+\begin_layout Plain Layout
+
+help fsreg               # Open the help file
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Section
+Example
+\end_layout
+
+\begin_layout Standard
+For illustration we use the 
+\begin_inset Quotes eld
+\end_inset
+
+mroz
+\begin_inset Quotes erd
+\end_inset
+
+ cross-sectional data set comprising 753 observations from a study of income
+ dynamics.
+ The endogenous variable is named 
+\family typewriter
+wage
+\family default
+ and refers to the a wife's 1975 average hourly earnings (in 1975 dollars).
+ The data set includes additional 24 potential predictors.
+\end_layout
+
+\begin_layout Standard
+The sample script opens the data set, sets the right-hand-side list of predictor
+s and computes standard least square estimates.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Box Doublebox
+position "t"
+hor_pos "c"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "100col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+\begin_inset listings
+lstparams "basicstyle={\footnotesize\ttfamily}"
+inline false
+status open
+
+\begin_layout Plain Layout
+
+open mroz.gdt --quiet
+\end_layout
+
+\begin_layout Plain Layout
+
+list RHS = const dataset
+\end_layout
+
+\begin_layout Plain Layout
+
+RHS -= wage            # drop lhs variable
+\end_layout
+
+\begin_layout Plain Layout
+
+ols LHS RHS	        # run ols as benchmark
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset VSpace defskip
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+The OLS output is:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Box Doublebox
+position "t"
+hor_pos "c"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "100col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+\begin_inset listings
+inline false
+status open
+
+\begin_layout Plain Layout
+
+m: OLS, using observations 1-753
+\end_layout
+
+\begin_layout Plain Layout
+
+Dependent variable: LHS
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\begin_layout Plain Layout
+
+                 coefficient    std.
+ error    t-ratio    p-value 
+\end_layout
+
+\begin_layout Plain Layout
+
+  ---------------------------------------------------------------
+\end_layout
+
+\begin_layout Plain Layout
+
+  const           4.10278       2.37643        1.726     0.0847   *
+\end_layout
+
+\begin_layout Plain Layout
+
+  taxableinc     −1.31268e-05   2.74615e-05   −0.4780    0.6328  
+\end_layout
+
+\begin_layout Plain Layout
+
+  federaltax      2.12780e-05   9.20550e-05    0.2311    0.8173  
+\end_layout
+
+\begin_layout Plain Layout
+
+  hsiblings      −0.000386927   0.0355359     −0.01089   0.9913  
+\end_layout
+
+\begin_layout Plain Layout
+
+  hfathereduc     0.0139611     0.0285757      0.4886    0.6253  
+\end_layout
+
+\begin_layout Plain Layout
+
+  hmothereduc    −0.0396817     0.0276745     −1.434     0.1520  
+\end_layout
+
+\begin_layout Plain Layout
+
+  siblings       −0.0694937     0.0358372     −1.939     0.0529   *
+\end_layout
+
+\begin_layout Plain Layout
+
+  lfp             3.45220       0.263461      13.10      2.25e-35 ***
+\end_layout
+
+\begin_layout Plain Layout
+
+  hours          −0.00111994    0.000152678   −7.335     5.91e-13 ***
+\end_layout
+
+\begin_layout Plain Layout
+
+  kidsl6         −0.0423818     0.179218      −0.2365    0.8131  
+\end_layout
+
+\begin_layout Plain Layout
+
+  kids618        −0.0329783     0.0703111     −0.4690    0.6392  
+\end_layout
+
+\begin_layout Plain Layout
+
+  age            −0.00589606    0.0226630     −0.2602    0.7948  
+\end_layout
+
+\begin_layout Plain Layout
+
+  educ            0.216125      0.0492212      4.391     1.30e-05 ***
+\end_layout
+
+\begin_layout Plain Layout
+
+  wage76          0.543352      0.0463328     11.73      3.26e-29 ***
+\end_layout
+
+\begin_layout Plain Layout
+
+  hhours         −0.000484660   0.000170424   −2.844     0.0046   ***
+\end_layout
+
+\begin_layout Plain Layout
+
+  hage            0.00327033    0.0217384      0.1504    0.8805  
+\end_layout
+
+\begin_layout Plain Layout
+
+  heduc          −0.0511196     0.0359926     −1.420     0.1560  
+\end_layout
+
+\begin_layout Plain Layout
+
+  hwage          −0.123328      0.0380489     −3.241     0.0012   ***
+\end_layout
+
+\begin_layout Plain Layout
+
+  faminc          3.36999e-05   1.52480e-05    2.210     0.0274   **
+\end_layout
+
+\begin_layout Plain Layout
+
+  mtr            −4.76933       2.38306       −2.001     0.0457   **
+\end_layout
+
+\begin_layout Plain Layout
+
+  mothereduc     −0.0282278     0.0299406     −0.9428    0.3461  
+\end_layout
+
+\begin_layout Plain Layout
+
+  fathereduc     −0.0220970     0.0285042     −0.7752    0.4385  
+\end_layout
+
+\begin_layout Plain Layout
+
+  unemployment   −0.0156837     0.0262039     −0.5985    0.5497  
+\end_layout
+
+\begin_layout Plain Layout
+
+  largecity       0.00659037    0.179593       0.03670   0.9707  
+\end_layout
+
+\begin_layout Plain Layout
+
+  exper           0.00247946    0.0121007      0.2049    0.8377  
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\begin_layout Plain Layout
+
+Mean dependent var   2.374565   S.D.
+ dependent var   3.241829
+\end_layout
+
+\begin_layout Plain Layout
+
+Sum squared resid    3351.283   S.E.
+ of regression   2.145556
+\end_layout
+
+\begin_layout Plain Layout
+
+R-squared            0.575954   Adjusted R-squared   0.561974
+\end_layout
+
+\begin_layout Plain Layout
+
+F(24, 728)           41.19977   P-value(F)           2.5e-118
+\end_layout
+
+\begin_layout Plain Layout
+
+Log-likelihood      −1630.588   Akaike criterion     3311.176
+\end_layout
+
+\begin_layout Plain Layout
+
+Schwarz criterion    3426.777   Hannan-Quinn         3355.711
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\begin_layout Plain Layout
+
+Excluding the constant, p-value was highest for variable 3 (hsiblings)
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset VSpace defskip
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Next, we run the forward stagewise regression by calling the 
+\family typewriter
+fsreg()
+\family default
+ function:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Box Doublebox
+position "t"
+hor_pos "c"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "100col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+\begin_inset listings
+lstparams "basicstyle={\footnotesize\ttfamily}"
+inline false
+status open
+
+\begin_layout Plain Layout
+
+bundle B = fsreg(LHS, RHS)
+\end_layout
+
+\begin_layout Plain Layout
+
+print_fsreg_results(B)      # Print estimation results
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset VSpace defskip
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+The regression results are as follows (note that inference is not supported,
+ yet!):
+\end_layout
+
+\begin_layout Standard
+\begin_inset Box Doublebox
+position "t"
+hor_pos "c"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "100col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+\begin_inset listings
+lstparams "basicstyle={\footnotesize\ttfamily}"
+inline false
+status open
+
+\begin_layout Plain Layout
+
+Info: No improvement in correlation for the last 50 iterations.
+\end_layout
+
+\begin_layout Plain Layout
+
+ Early stopping applies.
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\begin_layout Plain Layout
+
+Forward-stagewise regression results (no inference)
+\end_layout
+
+\begin_layout Plain Layout
+
+-------------------------------------------------------
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\begin_layout Plain Layout
+
+                coefficient    std.
+ error   z    p-value
+\end_layout
+
+\begin_layout Plain Layout
+
+  ------------------------------------------------------
+\end_layout
+
+\begin_layout Plain Layout
+
+  const          2.88386           NA       NA     NA   
+\end_layout
+
+\begin_layout Plain Layout
+
+  taxableinc    -1.36310e-05       NA       NA     NA   
+\end_layout
+
+\begin_layout Plain Layout
+
+  hmothereduc   -0.0483092         NA       NA     NA   
+\end_layout
+
+\begin_layout Plain Layout
+
+  siblings      -0.0700839         NA       NA     NA   
+\end_layout
+
+\begin_layout Plain Layout
+
+  lfp            3.27042           NA       NA     NA   
+\end_layout
+
+\begin_layout Plain Layout
+
+  hours         -0.000930155       NA       NA     NA   
+\end_layout
+
+\begin_layout Plain Layout
+
+  educ           0.213255          NA       NA     NA   
+\end_layout
+
+\begin_layout Plain Layout
+
+  wage76         0.535865          NA       NA     NA   
+\end_layout
+
+\begin_layout Plain Layout
+
+  hhours        -0.000272163       NA       NA     NA   
+\end_layout
+
+\begin_layout Plain Layout
+
+  heduc         -0.0536584         NA       NA     NA   
+\end_layout
+
+\begin_layout Plain Layout
+
+  hwage         -0.0766289         NA       NA     NA   
+\end_layout
+
+\begin_layout Plain Layout
+
+  faminc         2.65937e-05       NA       NA     NA   
+\end_layout
+
+\begin_layout Plain Layout
+
+  mtr           -3.88264           NA       NA     NA   
+\end_layout
+
+\begin_layout Plain Layout
+
+  mothereduc    -0.0481345         NA       NA     NA   
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\begin_layout Plain Layout
+
+  Number of iterations = 2068
+\end_layout
+
+\begin_layout Plain Layout
+
+  Correl.
+ w.
+ residuals = -0.0329421
+\end_layout
+
+\begin_layout Plain Layout
+
+  S.E.
+ of regression = 2.12071
+\end_layout
+
+\begin_layout Plain Layout
+
+  R-squared = 0.572159
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset VSpace defskip
+\end_inset
+
+The estimator converged after 2068 iterations and selected only 14 out of
+ 25 potential predictors.
+ The last correlation coefficient between the final residuals and some predictor
+ was found being close to zero (-0.033).
+ Even though only 14 predictors are selected being relevant, the 
+\begin_inset Formula $R^{2}$
+\end_inset
+
+ statistics is of similar size of the OLS equivalent.
+ Also the standard error of the residuals is slightly smaller with 2.12 compared
+ to the OLS-based value of 2.14.
+\end_layout
+
+\begin_layout Section
+Using the GUI
+\end_layout
+
+\begin_layout Standard
+Instead of scripting, one may access the 
+\family typewriter
+fsreg
+\family default
+ procedure by means of the Gretl GUI.
+ Once the package is installed and loaded, simply open the menu 
+\begin_inset Quotes eld
+\end_inset
+
+
+\emph on
+Model -> Other linear models -> Forward Stagewise
+\emph default
+
+\begin_inset Quotes erd
+\end_inset
+
+.
+ This a menu window as depicted in Figure 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "fig:GUI-access-window"
+plural "false"
+caps "false"
+noprefix "false"
+
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+placement h
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename gui.png
+	lyxscale 50
+	scale 50
+
+\end_inset
+
+
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+\begin_inset CommandInset label
+LatexCommand label
+name "fig:GUI-access-window"
+
+\end_inset
+
+GUI access window
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Section
+Public functions and parameter values
+\end_layout
+
+\begin_layout Standard
+The following public functions currently exist.
+\end_layout
+
+\begin_layout Subsection
+fsreg()
+\end_layout
+
+\begin_layout Standard
+The 
+\family typewriter
+fsreg()
+\family default
+ function marks the main function.
+ The function arguments are:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Box Boxed
+position "t"
+hor_pos "c"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "100col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+
+\family typewriter
+fsreg(const series y, const list X, bundle opts[null])
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Return type: 
+\family typewriter
+bundle
+\end_layout
+
+\begin_layout Standard
+\begin_inset VSpace defskip
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset Tabular
+<lyxtabular version="3" rows="4" columns="2">
+<features tabularvalignment="middle">
+<column alignment="center" valignment="top">
+<column alignment="left" valignment="top">
+<row>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Argument
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Description
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+y
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+series, Endogenous variable
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+X
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+list, Non-empty list of predictor variables
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+opts
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+bundle, Pass parameters for controlling the algorithm (optional)
+\end_layout
+
+\end_inset
+</cell>
+</row>
+</lyxtabular>
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Return type: 
+\family typewriter
+bundle
+\end_layout
+
+\begin_layout Standard
+\begin_inset VSpace defskip
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+The returned bundle includes various which are listed in Table 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "tab:Bundle-content-as"
+plural "false"
+caps "false"
+noprefix "false"
+
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float table
+placement h
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Tabular
+<lyxtabular version="3" rows="24" columns="2">
+<features tabularvalignment="middle">
+<column alignment="left" valignment="top">
+<column alignment="left" valignment="top">
+<row>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\series bold
+Parameter
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\series bold
+Description
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+rho_values
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Vector holding correlation coefficients with the residuals for each iteration
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+max_num_iterations
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Number of the maximum iterations
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+actual_num_iterations
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Actual number of iterations ran
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+eta
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Learning rate
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+early_stopping_rounds
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Number of iterations of no improvement before stopping
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+yname
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+String holding the name of the endogenous variable
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+Xnames_wo_constant
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+String array holding the names of all predictor variables without the constant
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+Xnames
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+String array holding the names of all predictor variables incl.
+ the constant
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+X_final
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+List incl.
+ finally selected predictors.
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+betas
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Matrix holding the coefficient point estimates across iterations (rows)
+ for
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+each predictor (columns)
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+coeff_nonzero
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+k by 1 vector incl.
+ the final coefficient point estimates for all selected 
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+predictors (non-zero coefficients)
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+coeff
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+n by 1 vector incl.
+ the coefficient point estimates of all predictors
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+(incl.
+ zero coefficients)
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+with_constant
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Boolean taking zero if the passed list X does not incl.
+ an intercept,
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+otherwise one
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+verbose
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Integer indicating the level of verbosity
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+T
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Number of effective (non-missing) observations.
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+yhat
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Fitted values using final point coefficient estimates
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+uhat
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Estimated final residuals
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+uhat_variance
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Variance of the estimated final residuals
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+r2_qcorr
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+R-square based on quadratic correlation between actual 
+\family typewriter
+y
+\family default
+ and fitted 
+\family typewriter
+y
+\end_layout
+
+\end_inset
+</cell>
+</row>
+</lyxtabular>
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+\begin_inset CommandInset label
+LatexCommand label
+name "tab:Bundle-content-as"
+
+\end_inset
+
+Bundle content as returned by 
+\family typewriter
+fsreg()
+\family default
+.
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset VSpace defskip
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+The additional parameters which can be passed by means of the 
+\family typewriter
+opts
+\family default
+ bundle to 
+\family typewriter
+fsreg()
+\family default
+ are shown in Table 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "tab:Parameters-which-can"
+plural "false"
+caps "false"
+noprefix "false"
+
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float table
+placement h
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Tabular
+<lyxtabular version="3" rows="6" columns="4">
+<features tabularvalignment="middle">
+<column alignment="left" valignment="top">
+<column alignment="left" valignment="top">
+<column alignment="left" valignment="top">
+<column alignment="left" valignment="top">
+<row>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\series bold
+Parameter
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\series bold
+Data type
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\series bold
+Description
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\series bold
+Default value
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+eta
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+scalar
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Learning rate; 
+\begin_inset Formula $0<\epsilon<1$
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+0.05
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+max_num_iterations
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+int
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Number of the maximum iterations
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+10000
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+early_stopping_rounds
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+int
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Number of iterations of no improvement
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+50
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+before stopping
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+verbose
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+bool
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Print details or not: either 0 or 1
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+1 (True)
+\end_layout
+
+\end_inset
+</cell>
+</row>
+</lyxtabular>
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+\begin_inset CommandInset label
+LatexCommand label
+name "tab:Parameters-which-can"
+
+\end_inset
+
+Parameters which can be set through the optional bundle 
+\family typewriter
+opts
+\family default
+.
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsection
+print_fsreg_results()
+\end_layout
+
+\begin_layout Standard
+The 
+\family typewriter
+print_fsreg_results()
+\family default
+ function takes the resulting bundle returned by the 
+\family typewriter
+fsreg()
+\family default
+ function, and prints a summary of the estimation results.
+ The argument is:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Box Boxed
+position "t"
+hor_pos "c"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "100col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+
+\family typewriter
+print_fsreg_results(const bundle B)
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Return type: 
+\family typewriter
+void
+\end_layout
+
+\begin_layout Subsection
+plot_rho_values()
+\end_layout
+
+\begin_layout Standard
+For plotting the development of the remaining correlation with the residuals,
+ simply call the 
+\family typewriter
+plot_rho_values()
+\family default
+ function.
+ It takes the resulting bundle returned by the 
+\family typewriter
+fsreg()
+\family default
+ function.
+ The argument is:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Box Boxed
+position "t"
+hor_pos "c"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "100col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+
+\family typewriter
+plot_rho_values(const bundle B)
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Return type: 
+\family typewriter
+void
+\end_layout
+
+\begin_layout Subsection
+plot_coefficient_paths()
+\end_layout
+
+\begin_layout Standard
+For plotting the development of the coefficients (coefficient paths), call
+ the 
+\family typewriter
+plot_coefficient_paths()
+\family default
+ function.
+ It takes the resulting bundle returned by the 
+\family typewriter
+fsreg()
+\family default
+ function.
+ The argument is:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Box Boxed
+position "t"
+hor_pos "c"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "100col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+
+\family typewriter
+plot_coefficient_paths(const bundle B)
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Return type: 
+\family typewriter
+void
+\end_layout
+
+\end_body
+\end_document

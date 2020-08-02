@@ -1,148 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <gretl-functions>
-<gretl-function-package name="fsreg" minver="2020b">
+<gretl-function-package name="fsreg" minver="2020b" lives-in-subdir="true">
 <author email="atecon@posteo.de">Artur Tarassow</author>
 <version>0.1</version>
-<date>2020-08-01</date>
+<date>2020-08-03</date>
 <description>Forward-stagewise sparse regression estimates</description>
-<tags>C52</tags>
+<tags>C13 C52</tags>
 <label>Forward Stagewise</label>
-<menu-attachment>MAINWIN/Model</menu-attachment>
+<menu-attachment>MAINWIN/Model/LinearModels</menu-attachment>
 <help>
-Fit best SARIMA(X) model to univariate time series.
-
-Returns best SARIMAX model according to either AIC, AICc, BIC or HQC value. The function conducts a (brute force) search over possible model within the order constraints provided.
-
-
-This is an alternative package to the existing gretl armax package written by Yi-Nung Yang which has some limitations, e.g. it does only work for ARMA type models.
-
-The features of the auto_arima package are:
-- Consideration of seasonal ARIMA models with and without exogenous regressors.
-- Simple API.
-- GUI access through the gretl menu.
-- Public convenience functions for the user for summarizing results, or retrieving the gretl ARIMA command of the 'best' model.
-- Source code is tested by means of unit-tests to minimize bugs.
-
-Please ask questions and report bugs on the gretl mailing list if possible. Alternatively, create an issue ticket on the github repo (see below).
-Source code and test script(s) can be found here:
-https://github.com/atecon/auto_arima
-
-
-
-PUBLIC FUNCTIONS:
------------------------------------------------------------------------
-Function:       auto_arima(const series y, const list xlist[null],
-                bundle opts[null])
-Arguments:
-y:              series, Endogenous variable
-xlist:          list, List of exogenous variables (optional)
-opts:           bundle, Bundle for passing SARIMA parameters and further
-                options (see below for details)
-
-Return:
-Bundle comprising the various items.
------------------------------------------------------------------------
-
------------------------------------------------------------------------
-Function:       print_auto_arima_results(const bundle model)
-
-Arguments:
-model:          bundle, Bundle returned by auto_arima() function
-
-Return:
-No return value. Print summary results for each parameter combination and
-information criteria estimated in tabular form.
------------------------------------------------------------------------
-
------------------------------------------------------------------------
-Function:       get_auto_arima_parameters (const bundle model, const string
-                info_criteria, const int model_rank[1::])
-
-Arguments:
-model:          bundle, Bundle returned by auto_arima() function
-info_criteria:  string, Name of information criteria (either &quot;aicc&quot;, &quot;aic&quot;,
-                &quot;bic&quot; or &quot;hqc&quot;) for which to return SARIMA parameter vector
-model_rank:     int, Compute the SARIMA parameter vector for the n-th
-                best model in terms of the chosen information criteria.
-
-Return:
-Vector of SARIMA parameters of the n-th best model in terms of the chosen information criteria.
------------------------------------------------------------------------
-
------------------------------------------------------------------------
-Function:       get_auto_arima_command (const bundle model, const string
-                info_criteria, const int model_rank[1::])
-
-Arguments:
-model:          bundle, Bundle returned by auto_arima() function
-info_criteria:  string, Name of information criteria (either &quot;aicc&quot;, &quot;aic&quot;,
-                &quot;bic&quot; or &quot;hqc&quot;) for which to return SARIMA parameter vector
-model_rank:     int, Consider the n-th best model in terms of the chosen
-                information criteria.
-
-Return:
-String holding the gretl/ hansl command for estimating the selected model.
------------------------------------------------------------------------
-
------------------------------------------------------------------------
-Function:       auto_arima_gui()
-
-Arguments:
-
-Return:
-A wrapper for the GUI. Prints summary results and returns a bundle with model results.
------------------------------------------------------------------------
-
-
-
-The optional 'opts' bundle:
-----------------------------
-The user can pass an optional bundle as the 3rd argument to the
-auto_arima() function. Currently, the following options are supported:
-
-* verbose:           bool, print details if 1, otherwise no print out
-                     (default 1).
-* with_intercept:    bool, if 1 (or TRUE) an intercept is added to the
-                     model, of 0 (or FALSE) no intercept is added (default 1).
-* with_seasonality:  bool, if 1 (or TRUE) seasonal ARIMA parameters
-                     combinations are considered (if the data frequency
-                     has seasonality), otherwise seasonal ARIMA parameters
-                     are not considered (default 1).
-* estimation_method: string, if &quot;conditional_ml&quot; use conditional maximum
-                     likelihood
-* min_p, max_p, min_d, max_d, min_q, max_q, min_P, max_P, min_D, max_D, min_Q, max_Q:               Model parameters (see below for explanations)
-
-
-
-Default SARIMA parameter values:
---------------------------------
-* min_p          :  scalar, minimum autoregressive order (default 0)
-* max_p          :  scalar, maximum autoregressive order (default 4)
-* min_d          :  scalar, minimum order of 1-st differencing (default 0)
-* max_d          :  scalar, maximum order of 1-st differencing (default 1)
-* min_q          :  scalar, minimum moving-average order (default 0)
-* max_q          :  scalar, maximum moving-average order (default 4)
-* min_P          :  scalar, minimum seasonal moving-average order (default 0)
-* max_P          :  scalar, maximum seasonal moving-average order (default 1)
-* min_D          :  scalar, minimum order of seasonal-differencing (default 0)
-* max_D          :  scalar, maximum order of seasonal-differencing (default 1)
-* min_Q          :  scalar, minimum seasonal moving-average order (default 0)
-* max_Q          :  scalar, maximum seasonal moving-average order (default 1)
-
-
-
-Changelog:
-- v0.51, July 2020:
-    + Fix bug when executing get_auto_arima_command() function: Names of endogenous series and exogenous list where not correct in every case.
-    + GUI access: Boolean parameter &quot;seasonality&quot; dropped: It is automatically checked now whether the active data set has seasonal frequency.
-    + Minor formatting improvements.
-
-- v0.5, July 2020:
-	+ initial release
+pdfdoc:fsreg.pdf
 </help>
-<depends count="2">
-ridge string_utils </depends>
-<provider>ridge</provider>
+<depends count="5">
+string_utils ridge provider = ridge </depends>
 <gretl-function name="fsreg" type="bundle">
  <params count="3">
   <param name="y" type="series" const="true">
@@ -164,7 +34,7 @@ if exists(opts)
   self = opts + self         # override defaults
 endif
 # Initilizations
-string self.ynames = argname(y)
+string self.yname = argname(y)
 strings self.Xnames = varnames(X)
 initialize(&amp;self, y, X)
 stdize_y_and_x(&amp;self)
@@ -172,24 +42,18 @@ fsreg_estimator(&amp;self)
 post_process(&amp;self)
 # Handle intercept: non-scaled as &quot;coeff&quot; is already re-scaled
 matrix resids = get_residuals({y}, {self.X_without_const}, self.coeff)
-#gnuplot 1 --matrix=resids --with-lines --time-series --output=display
 if self.with_constant
   scalar self.resid_mean = meanc(resids)
   self.coeff = self.resid_mean | self.coeff
 endif
 matrix self.coeff_nonzero = get_nonzero_rescaled_coeffs(self)
-scalar self.s2s = get_residuals_variance(cdemean(resids), self.T)
-# attach variable names to coefficient vector
 attach_coefficient_row_labels(&amp;self)
 # FIXME: I could not found how to determine the degrees of freedom for fsreg estimator
 scalar self.num_parameters = rows(vec(self.coeff_nonzero))
-matrix resids_demeaned = resids - self.resid_mean
-# Compute r-square
-matrix y_pred = get_y_pred({X}, self.coeff)  # consider const if present
-matrix r_squares = r2_stats(self.my, y_pred, self.num_parameters)
-self.r2_qcorr] = r_squares[1]
-#self.r2_qcorr_adj = r_squares[2]          # depends on self.num_parameters
-#self.r2_scores = r_squares[3]
+add_yhat_and_uhat_to_bundle(y, X, &amp;self)
+scalar self.uhat_variance = sd(self.uhat)
+compute_r_squares(&amp;self)
+list self.X_final = add_selected_predictors_to_list(X, self)
 cleanup_bundle(&amp;self)
 return self
 </code>
@@ -203,7 +67,7 @@ if self.verbose
   printf &quot;\nForward-stagewise regression results (no inference)&quot;
   printf &quot;\n-------------------------------------------------------\n&quot;
   strings label_str = defarray(&quot;const&quot;) + get_names_of_nonzero_coeffs(self) + defarray(&quot;Number of iterations&quot;, &quot;Correl. w. residuals&quot;, &quot;S.E. of regression&quot;, &quot;R-squared&quot;)
-  matrix extra = self.actual_num_iterations |self.rho_values[self.actual_num_iterations] | sqrt(self.s2s) | self.r2_qcorr
+  matrix extra = self.actual_num_iterations |self.rho_values[self.actual_num_iterations] | sd(self.uhat) | self.r2_qcorr
   scalar k = rows(self.coeff_nonzero)
   matrix bhat = self.coeff_nonzero ~ mshape(NA, k, 1)
   modprint bhat label_str extra
@@ -211,39 +75,43 @@ endif
 </code>
 </gretl-function>
 <gretl-function name="plot_rho_values" type="void">
- <params count="2">
+ <params count="3">
   <param name="self" type="bundle"/>
+  <param name="filename" type="string" optional="true">
+<description>Path + filename to store figure</description>
+  </param>
   <param name="absolute_values" type="bool" default="1" const="true"/>
  </params>
 <code>/* Plot correlation coefficients. */
-string self.rhoplot_title = &quot;Forward stagewise correlation values&quot;
-string self.ylabel = (absolute_values == FALSE) ? &quot;Correlations w. residuals&quot; : &quot;Absol. correlations w. residuals&quot;
-scalar self.rhoplot_fontsize = 12
-string self.rhoplot_filename = &quot;display&quot;
-string filename = self.rhoplot_filename
+string title = &quot;Forward stagewise correlation values&quot;
+string ylabel = (absolute_values == FALSE) ? &quot;Correlations w. residuals&quot; : &quot;Absol. correlations w. residuals&quot;
+scalar fontsize = 12
+string filename = (exists(filename)) ? filename : &quot;display&quot;
 matrix mplot = (absolute_values == TRUE) ? abs(self.rho_values) : self.rho_values
 plot mplot
   options with-lines time-series
   literal set linetype 1 lc rgb &quot;black&quot; lw 1.5
   literal set nokey
   literal set grid
-  printf &quot;set title \&quot;%s\&quot; font \&quot;, %d\&quot;&quot;, self.rhoplot_title, self.rhoplot_fontsize
-  printf &quot;set xlabel 'Iterations' font \&quot;, %d\&quot;&quot;, self.rhoplot_fontsize
-  printf &quot;set ylabel '%s' font \&quot;, %d\&quot;&quot;, self.ylabel, self.rhoplot_fontsize
+  printf &quot;set title \&quot;%s\&quot; font \&quot;, %d\&quot;&quot;, title, fontsize
+  printf &quot;set xlabel 'Iterations' font \&quot;, %d\&quot;&quot;, fontsize
+  printf &quot;set ylabel '%s' font \&quot;, %d\&quot;&quot;, ylabel, fontsize
 end plot --output=&quot;@filename&quot;
 </code>
 </gretl-function>
 <gretl-function name="plot_coefficient_paths" type="void">
- <params count="2">
+ <params count="3">
   <param name="self" type="bundle"/>
+  <param name="filename" type="string" optional="true">
+<description>Path + filename to store figure</description>
+  </param>
   <param name="ylog_scale" type="bool" default="0" const="true"/>
  </params>
 <code>/* Plot coefficient paths. */
-string self.coeffplot_title = &quot;Forward stagewise coefficient paths&quot;
-string self.ylabel = (ylog_scale == FALSE) ? &quot;Standardized coefficients&quot; : &quot;Standardized coefficients (in logarithms)&quot;
-scalar self.coeffplot_fontsize = 12
-string self.coeffplot_filename = &quot;display&quot;
-string filename = self.coeffplot_filename
+string title = &quot;Forward stagewise coefficient paths&quot;
+string ylabel = (ylog_scale == FALSE) ? &quot;Standardized coefficients&quot; : &quot;Standardized coefficients (in logarithms)&quot;
+scalar fontsize = 12
+string filename = (exists(filename)) ? filename : &quot;display&quot;
 string ylog_scale_str = (ylog_scale == TRUE) ? &quot;--ylogscale=10&quot; : &quot;&quot;
 matrix mplot = self.betas
 cnameset(mplot, self.Xnames)
@@ -252,9 +120,9 @@ plot mplot
   #literal set linetype 3 lc rgb &quot;#0000ff&quot;
   #literal set nokey
   literal set grid
-  printf &quot;set title \&quot;%s\&quot; font \&quot;, %d\&quot;&quot;, self.coeffplot_title, self.coeffplot_fontsize
-  printf &quot;set xlabel 'Iterations' font \&quot;, %d\&quot;&quot;, self.coeffplot_fontsize
-  printf &quot;set ylabel '%s' font \&quot;, %d\&quot;&quot;, self.ylabel, self.coeffplot_fontsize
+  printf &quot;set title \&quot;%s\&quot; font \&quot;, %d\&quot;&quot;, title, fontsize
+  printf &quot;set xlabel 'Iterations' font \&quot;, %d\&quot;&quot;, fontsize
+  printf &quot;set ylabel '%s' font \&quot;, %d\&quot;&quot;, ylabel, fontsize
   printf &quot;set yrange[%g:%g]&quot;, min(mplot)*1.1, max(mplot)*1.1
 end plot --output=&quot;@filename&quot;
 </code>
@@ -314,8 +182,8 @@ return model
 bundle self = null
 scalar self.verbose = 1
 scalar self.eta = 0.05         # kind of learning rate
-scalar self.max_num_iterations = 2000
-scalar self.early_stopping_rounds = 10
+scalar self.max_num_iterations = 10000
+scalar self.early_stopping_rounds = 50
 return self
 </code>
 </gretl-function>
@@ -351,6 +219,42 @@ matrix self.betas = zeros(self.max_num_iterations, nelem(self.X_without_const))
 scalar self.actual_num_iterations = NA
 </code>
 </gretl-function>
+<gretl-function name="add_selected_predictors_to_list" type="list" private="1">
+ <params count="2">
+  <param name="X" type="list" const="true"/>
+  <param name="self" type="bundle" const="true"/>
+ </params>
+<code>/* Add selected preditors to list. */
+list L = (self.with_constant == TRUE) ? const : null
+S = get_names_of_nonzero_coeffs(self)
+loop foreach i S
+  list L += genseries(&quot;$i&quot;, X.$i)
+endloop
+return L
+</code>
+</gretl-function>
+<gretl-function name="add_yhat_and_uhat_to_bundle" type="void" private="1">
+ <params count="3">
+  <param name="y" type="series" const="true"/>
+  <param name="X" type="list" const="true"/>
+  <param name="self" type="bundleref"/>
+ </params>
+<code>/* Add final fitted values and residuals to bundle. */
+series self.yhat = get_y_pred({X}, self.coeff)  # considering &quot;const&quot; if
+series self.uhat = y - self.yhat
+</code>
+</gretl-function>
+<gretl-function name="compute_r_squares" type="void" private="1">
+ <params count="1">
+  <param name="self" type="bundleref"/>
+ </params>
+<code>/* Wrapper calling functions for computing R^2. Currently, we only know that stuff is statistically correct for statistics &quot;r2_qcorr&quot;. */
+matrix r_squares = r2_stats(self.my, {self.yhat}, self.num_parameters)
+self.r2_qcorr = r_squares[1]
+#self.r2_qcorr_adj = r_squares[2]          # depends on self.num_parameters
+#self.r2_scores = r_squares[3]
+</code>
+</gretl-function>
 <gretl-function name="cleanup_bundle" type="void" private="1">
  <params count="1">
   <param name="self" type="bundleref"/>
@@ -359,8 +263,11 @@ scalar self.actual_num_iterations = NA
 delete self.Xsd
 delete self.ysd
 delete self.mX
+delete self.y
+delete self.my
 delete self.num_parameters
 delete self.X_without_const
+delete self.resid_mean
 </code>
 </gretl-function>
 <gretl-function name="attach_coefficient_row_labels" type="void" private="1">
@@ -538,28 +445,20 @@ return selected_vars
 <sample-script>
 set verbose off
 clear
-
-
-#set workdir &quot;/home/at/git/fsreg&quot;
-
 include fsreg.gfn
-#include string_utils.gfn
-#include ridge.gfn           # min. v1.11
-#include &quot;./src/fsreg.inp&quot; --force
 
-scalar runEX = 1		# select an example
+
+scalar runEX = 3		# select an example
 
 # Select an example
-if runEX==1
-    open australia.gdt -q --preserve
+if runEX == 1
+    open australia.gdt -q -p    # time-series data set
 
     # define the variables
     series LHS = ldiff(PAU)
     list RHS = const LHS(-1 to -2) IUS(-1 to -2)  IAU(-1 to -2)
 
-    ols LHS RHS
-
-elif runEX==2
+elif runEX == 2
     # SIMULATION
     nulldata 750
     set seed 1234
@@ -574,34 +473,55 @@ elif runEX==2
         RHS += genseries(sprintf(&quot;S%d&quot;, $i), X[,i])
     endloop
 
-    ols LHS RHS
+elif runEX == 3
+    open mroz.gdt -q -p     # cross-sectional data set
+    series LHS = wage
+    list RHS = const dataset
+
+    RHS -= LHS wage     # drop lhs varianle
 endif
 
-# run the main function with default values
-bundle opts = null
-scalar opts.verbose = 1
-scalar opts.eta = 0.05                  # learning rate
-scalar opts.max_num_iterations = 5000  # max. number of boosting rounds
-scalar opts.early_stopping_rounds = 30 # stop if no improvement after n rounds
+# Run standard OLS as benchmark
+ols LHS RHS
+
 
 
 # Run estimation
-bundle B = fsreg(LHS, RHS, opts)
+bundle B = fsreg(LHS, RHS)
 
-print B                 # print bundle items
+print_fsreg_results(B)      # Print estimation results
 
-# Print estimation results
-print_fsreg_results(B)
+list X_final = B.X_final    # Retrieve list of selected regressors
+X_final
 
 # Retrieve point estimates
-#eval B.coeff            # retrieve point estimates of all variables
+eval B.coeff            # retrieve point estimates of all variables
 eval B.coeff_nonzero    # retrieve point estimates of selected variables
+
+series yhat = B.yhat    # Retrieve fitted values
+
+# Plot realizations vs. fitted values
+gnuplot LHS yhat --output=&quot;display&quot;
 
 # Plot correlations as a function of iterations
 plot_rho_values(B)
 
 # Plot coefficient paths
 plot_coefficient_paths(B)
+
+
+/* Activate if wished
+# Define own parameter set
+bundle opts = null
+scalar opts.verbose = 1
+scalar opts.eta = 0.001                  # learning rate
+scalar opts.max_num_iterations = 5000   # max. number of boosting rounds
+scalar opts.early_stopping_rounds = 20  # stop if no improvement after n rounds
+
+# Run estimation
+bundle B = fsreg(LHS, RHS, opts)
+print_fsreg_results(B)      # Print estimation results
+*/
 </sample-script>
 </gretl-function-package>
 </gretl-functions>
