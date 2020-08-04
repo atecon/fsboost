@@ -241,7 +241,10 @@ return L
   <param name="self" type="bundleref"/>
  </params>
 <code>/* Add final fitted values and residuals to bundle. */
-series self.yhat = get_y_pred({X}, self.coeff)  # considering &quot;const&quot; if
+eval nelem(X)
+eval rows(self.coeff)
+eval lincomb(X, self.coeff)
+series self.yhat = lincomb(X, self.coeff)
 series self.uhat = y - self.yhat
 </code>
 </gretl-function>
