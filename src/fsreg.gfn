@@ -241,9 +241,6 @@ return L
   <param name="self" type="bundleref"/>
  </params>
 <code>/* Add final fitted values and residuals to bundle. */
-eval nelem(X)
-eval rows(self.coeff)
-eval lincomb(X, self.coeff)
 series self.yhat = lincomb(X, self.coeff)
 series self.uhat = y - self.yhat
 </code>
