@@ -11,4 +11,5 @@ label = Forward Stagewise
 menu-attachment = MAINWIN/Model/LinearModels
 help = fsreg.pdf
 sample-script = fsreg_sample.inp
-depends = string_utils ridge provider = ridge
+depends = string_utils ridge
+provider = ridge
