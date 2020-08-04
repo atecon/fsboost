@@ -11,8 +11,9 @@
 <help>
 pdfdoc:fsreg.pdf
 </help>
-<depends count="5">
-string_utils ridge provider = ridge </depends>
+<depends count="2">
+ridge string_utils </depends>
+<provider>ridge</provider>
 <gretl-function name="fsreg" type="bundle">
  <params count="3">
   <param name="y" type="series" const="true">
