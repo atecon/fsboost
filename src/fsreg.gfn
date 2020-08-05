@@ -193,12 +193,10 @@ return self
   <param name="self" type="bundleref"/>
  </params>
 <code>/* Demeaning series y and list X and compute associated std.-errors. */
-matrix my = cdemean({self.y})
-scalar self.ysd = sdc(my)
-self.my = my ./ self.ysd
-matrix mX = cdemean({self.X_without_const})
-matrix self.Xsd = sdc(mX)           # gives row vector
-self.mX = mX ./ self.Xsd
+matrix self.my = cdemean({self.y}, TRUE)
+scalar self.ysd = sdc(self.my)
+matrix self.mX = cdemean({self.X_without_const}, TRUE)
+matrix self.Xsd = sdc(self.mX)           # gives row vector
 </code>
 </gretl-function>
 <gretl-function name="initialize" type="void" private="1">
