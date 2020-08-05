@@ -3,7 +3,7 @@ set -e
 
 DIR=$(dirname $(realpath "$0")) 	# locate folder where this sh-script is located in
 SCRIPT="./tests/run_tests.inp"
-PROJECT="forward_stagewise"
+PROJECT="fsboost"
 
 cd $DIR
 echo "Switched to ${DIR}"

@@ -74,7 +74,7 @@ function bundle fsreg (const series y "Dep. variable",
                        const list X "Candidates",
                        bundle opts[null])
 
-    /* Main function for forward stagewise regression. */
+    /* Main function for forward stagewise boosted regression. */
 
     if $datatype != 1       # cross-sectional or panel
         smpl --no-missing y X

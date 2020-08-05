@@ -1,4 +1,4 @@
-PKG = fsreg
+PKG = fsboost
 
 $(PKG).gfn: $(PKG).inp $(PKG).spec $(PKG)_sample.inp
 	gretlcli --makepkg $(PKG).inp

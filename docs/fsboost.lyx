@@ -83,9 +83,9 @@
 \begin_body
 
 \begin_layout Title
-The Gretl 
+The Gretl
 \family typewriter
-fsreg
+fsboost
 \family default
  function package for running the forward stagewise regression
 \end_layout
@@ -170,28 +170,28 @@ Selecting the relevant predictors among a many potential ones is a crucial
  Furthermore, considering highly correlated predictors into a standard least
  square regression most probably suffers from multicollinearity issues.
  Lastly, standard least squares cannot handle the case when the number of
- observations, 
+ observations,
 \begin_inset Formula $T$
 \end_inset
 
-, exceeds the number of potential regressors, 
+, exceeds the number of potential regressors,
 \begin_inset Formula $k$
 \end_inset
 
 .
- 
+
 \end_layout
 
 \begin_layout Standard
 So called shrinkage and/ or selection estimators such as Ridge or Lasso
  among others, are known to handle such issues.
  Another estimation approach marks the so called forward stagewise regression
- approach (FSREG henceforth).
- FSREG follows a simple strategy for constructing a sequence of sparse regressio
+ approach (fsboost henceforth).
+ fsboost follows a simple strategy for constructing a sequence of sparse regressio
 n estimates: Initially set all coefficients to zero, and iteratively update
- the coefficient (by a small amount, depending on the 
+ the coefficient (by a small amount, depending on the
 \emph on
-learning rate 
+learning rate
 \begin_inset Formula $\epsilon$
 \end_inset
 
@@ -213,11 +213,11 @@ learning rate
 \end_layout
 
 \begin_layout Section
-The FSREG algorithm
+The fsboost algorithm
 \end_layout
 
 \begin_layout Standard
-The FSREG algorithm works as follows:
+The fsboost algorithm works as follows:
 \begin_inset Foot
 status open
 
@@ -232,11 +232,11 @@ Also note, that this is analogous to least squares boosting, with the number
 \end_layout
 
 \begin_layout Enumerate
-Start with 
+Start with
 \begin_inset Formula $r=y$
 \end_inset
 
- and 
+ and
 \begin_inset Formula $\beta_{1}=\beta_{2}=\ldots=\beta_{k}=0$
 \end_inset
 
@@ -244,11 +244,11 @@ Start with
 \end_layout
 
 \begin_layout Enumerate
-Find the predictor 
+Find the predictor
 \begin_inset Formula $x_{j}$
 \end_inset
 
- most correlated with 
+ most correlated with
 \begin_inset Formula $r$
 \end_inset
 
@@ -256,15 +256,15 @@ Find the predictor
 \end_layout
 
 \begin_layout Enumerate
-Update the 
+Update the
 \begin_inset Formula $j$
 \end_inset
 
--th predictor 
+-th predictor
 \begin_inset Formula $\beta_{j}^{i}\leftarrow\beta_{j}^{i-1}+\delta_{j}$
 \end_inset
 
- where 
+ where
 \begin_inset Formula $\delta_{j}=\epsilon\times\text{sign}<r^{i-1},x_{j}>$
 \end_inset
 
@@ -272,7 +272,7 @@ Update the
 \end_layout
 
 \begin_layout Enumerate
-Update the residuals 
+Update the residuals
 \begin_inset Formula $r^{i}\leftarrow r^{i-1}-\delta_{j}\times x_{j}$
 \end_inset
 
@@ -280,11 +280,11 @@ Update the residuals
 \end_layout
 
 \begin_layout Standard
-Here 
+Here
 \begin_inset Formula $y$
 \end_inset
 
-, 
+,
 \series bold
 
 \begin_inset Formula $\beta$
@@ -292,49 +292,49 @@ Here
 
 
 \series default
-, 
+,
 \begin_inset Formula $\epsilon$
 \end_inset
 
-, 
+,
 \begin_inset Formula $<r,x_{j}>$
 \end_inset
 
- and 
+ and
 \begin_inset Formula $i$
 \end_inset
 
  refer to the endogenous variable, the unknown regression coefficients,
  the learning rate, the correlation between the current residuals and the
- 
+
 \begin_inset Formula $j$
 \end_inset
 
--th regressor and the 
+-th regressor and the
 \begin_inset Formula $i$
 \end_inset
 
 -th iteration.
- The learning rate 
+ The learning rate
 \begin_inset Formula $\epsilon$
 \end_inset
 
- is a hyper-parameter and set to a fixed constant (e.g., 
+ is a hyper-parameter and set to a fixed constant (e.g.,
 \begin_inset Formula $\epsilon=0.01$
 \end_inset
 
 ).
  The only computations intense task is to compute the correlation between
- 
+
 \begin_inset Formula $r$
 \end_inset
 
- and the all 
+ and the all
 \begin_inset Formula $k$
 \end_inset
 
  predictors.
- We make use of Gretl's 
+ We make use of Gretl's
 \family typewriter
 mcorr()
 \family default
@@ -343,7 +343,7 @@ mcorr()
 
 \begin_layout Standard
 The idea behind the stagewise updates is simple: at each iteration greedily
- select the predictor 
+ select the predictor
 \begin_inset Formula $j$
 \end_inset
 
@@ -356,12 +356,12 @@ The idea behind the stagewise updates is simple: at each iteration greedily
 
 \begin_layout Standard
 Given the greediness that only a single predictor is selected each iteration,
- updating the coefficient of variable 
+ updating the coefficient of variable
 \begin_inset Formula $j$
 \end_inset
 
  by a large amount is problematic.
- Instead, the parameter 
+ Instead, the parameter
 \begin_inset Formula $\text{\ensuremath{\epsilon}}$
 \end_inset
 
@@ -369,7 +369,7 @@ Given the greediness that only a single predictor is selected each iteration,
  amount.
  Thus, many iterations are required to yield reasonable parameter estimates
  among a large set of potential predictor variables.
- Figure 
+ Figure
 \begin_inset CommandInset ref
 LatexCommand ref
 reference "fig:Coefficient-paths"
@@ -428,32 +428,32 @@ Coefficient paths
 
 \begin_layout Standard
 Early stopping rules are important for two reasons: First, one tries to
- avoid over-fitting, and second it may be unnecessary to run 
+ avoid over-fitting, and second it may be unnecessary to run
 \begin_inset Formula $\bar{N}$
 \end_inset
 
  iterations if no improvement (in terms of model fit) can be seen after
- 
+
 \begin_inset Formula $N\ll\bar{N}$
 \end_inset
 
  iterations.
  The implemented early stopping strategy checks the absolute correlation
- 
+
 \begin_inset Formula $|<r,x_{j}^{i}>|$
 \end_inset
 
-: In case the absolute correlation does not improve for 
+: In case the absolute correlation does not improve for
 \begin_inset Formula $n$
 \end_inset
 
- (e.g., 
+ (e.g.,
 \begin_inset Formula $n=30)$
 \end_inset
 
  iterations, we assume that the coefficient estimates have converged and
  stop the algorithm.
- Figure 
+ Figure
 \begin_inset CommandInset ref
 LatexCommand ref
 reference "fig:Correlation-dynamics"
@@ -511,9 +511,9 @@ Install and load the package
 \end_layout
 
 \begin_layout Standard
-The 
+The
 \family typewriter
-fsreg
+fsboost
 \family default
  package is publicly available on the gretl server.
  The package must be downloaded once, and loaded into memory each time gretl
@@ -561,17 +561,17 @@ set verbose off
 
 \begin_layout Plain Layout
 
-pkg install fsreg        # Download package (only once need)
+pkg install fsboost        # Download package (only once need)
 \end_layout
 
 \begin_layout Plain Layout
 
-include fsreg.gfn        # Load the package into memory
+include fsboost.gfn        # Load the package into memory
 \end_layout
 
 \begin_layout Plain Layout
 
-help fsreg               # Open the help file
+help fsboost               # Open the help file
 \end_layout
 
 \end_inset
@@ -589,7 +589,7 @@ Example
 \end_layout
 
 \begin_layout Standard
-For illustration we use the 
+For illustration we use the
 \begin_inset Quotes eld
 \end_inset
 
@@ -599,7 +599,7 @@ mroz
 
  cross-sectional data set comprising 753 observations from a study of income
  dynamics.
- The endogenous variable is named 
+ The endogenous variable is named
 \family typewriter
 wage
 \family default
@@ -719,7 +719,7 @@ Dependent variable: LHS
 \begin_layout Plain Layout
 
                  coefficient    std.
- error    t-ratio    p-value 
+ error    t-ratio    p-value
 \end_layout
 
 \begin_layout Plain Layout
@@ -734,27 +734,27 @@ Dependent variable: LHS
 
 \begin_layout Plain Layout
 
-  taxableinc     −1.31268e-05   2.74615e-05   −0.4780    0.6328  
+  taxableinc     −1.31268e-05   2.74615e-05   −0.4780    0.6328
 \end_layout
 
 \begin_layout Plain Layout
 
-  federaltax      2.12780e-05   9.20550e-05    0.2311    0.8173  
+  federaltax      2.12780e-05   9.20550e-05    0.2311    0.8173
 \end_layout
 
 \begin_layout Plain Layout
 
-  hsiblings      −0.000386927   0.0355359     −0.01089   0.9913  
+  hsiblings      −0.000386927   0.0355359     −0.01089   0.9913
 \end_layout
 
 \begin_layout Plain Layout
 
-  hfathereduc     0.0139611     0.0285757      0.4886    0.6253  
+  hfathereduc     0.0139611     0.0285757      0.4886    0.6253
 \end_layout
 
 \begin_layout Plain Layout
 
-  hmothereduc    −0.0396817     0.0276745     −1.434     0.1520  
+  hmothereduc    −0.0396817     0.0276745     −1.434     0.1520
 \end_layout
 
 \begin_layout Plain Layout
@@ -774,17 +774,17 @@ Dependent variable: LHS
 
 \begin_layout Plain Layout
 
-  kidsl6         −0.0423818     0.179218      −0.2365    0.8131  
+  kidsl6         −0.0423818     0.179218      −0.2365    0.8131
 \end_layout
 
 \begin_layout Plain Layout
 
-  kids618        −0.0329783     0.0703111     −0.4690    0.6392  
+  kids618        −0.0329783     0.0703111     −0.4690    0.6392
 \end_layout
 
 \begin_layout Plain Layout
 
-  age            −0.00589606    0.0226630     −0.2602    0.7948  
+  age            −0.00589606    0.0226630     −0.2602    0.7948
 \end_layout
 
 \begin_layout Plain Layout
@@ -804,12 +804,12 @@ Dependent variable: LHS
 
 \begin_layout Plain Layout
 
-  hage            0.00327033    0.0217384      0.1504    0.8805  
+  hage            0.00327033    0.0217384      0.1504    0.8805
 \end_layout
 
 \begin_layout Plain Layout
 
-  heduc          −0.0511196     0.0359926     −1.420     0.1560  
+  heduc          −0.0511196     0.0359926     −1.420     0.1560
 \end_layout
 
 \begin_layout Plain Layout
@@ -829,27 +829,27 @@ Dependent variable: LHS
 
 \begin_layout Plain Layout
 
-  mothereduc     −0.0282278     0.0299406     −0.9428    0.3461  
+  mothereduc     −0.0282278     0.0299406     −0.9428    0.3461
 \end_layout
 
 \begin_layout Plain Layout
 
-  fathereduc     −0.0220970     0.0285042     −0.7752    0.4385  
+  fathereduc     −0.0220970     0.0285042     −0.7752    0.4385
 \end_layout
 
 \begin_layout Plain Layout
 
-  unemployment   −0.0156837     0.0262039     −0.5985    0.5497  
+  unemployment   −0.0156837     0.0262039     −0.5985    0.5497
 \end_layout
 
 \begin_layout Plain Layout
 
-  largecity       0.00659037    0.179593       0.03670   0.9707  
+  largecity       0.00659037    0.179593       0.03670   0.9707
 \end_layout
 
 \begin_layout Plain Layout
 
-  exper           0.00247946    0.0121007      0.2049    0.8377  
+  exper           0.00247946    0.0121007      0.2049    0.8377
 \end_layout
 
 \begin_layout Plain Layout
@@ -915,9 +915,9 @@ Excluding the constant, p-value was highest for variable 3 (hsiblings)
 \end_layout
 
 \begin_layout Standard
-Next, we run the forward stagewise regression by calling the 
+Next, we run the forward stagewise regression by calling the
 \family typewriter
-fsreg()
+fsboost()
 \family default
  function:
 \end_layout
@@ -949,12 +949,12 @@ status open
 
 \begin_layout Plain Layout
 
-bundle B = fsreg(LHS, RHS)
+bundle B = fsboost(LHS, RHS)
 \end_layout
 
 \begin_layout Plain Layout
 
-print_fsreg_results(B)      # Print estimation results
+print_fsboost_results(B)      # Print estimation results
 \end_layout
 
 \end_inset
@@ -1045,72 +1045,72 @@ Forward-stagewise regression results (no inference)
 
 \begin_layout Plain Layout
 
-  const          2.88386           NA       NA     NA   
+  const          2.88386           NA       NA     NA
 \end_layout
 
 \begin_layout Plain Layout
 
-  taxableinc    -1.36310e-05       NA       NA     NA   
+  taxableinc    -1.36310e-05       NA       NA     NA
 \end_layout
 
 \begin_layout Plain Layout
 
-  hmothereduc   -0.0483092         NA       NA     NA   
+  hmothereduc   -0.0483092         NA       NA     NA
 \end_layout
 
 \begin_layout Plain Layout
 
-  siblings      -0.0700839         NA       NA     NA   
+  siblings      -0.0700839         NA       NA     NA
 \end_layout
 
 \begin_layout Plain Layout
 
-  lfp            3.27042           NA       NA     NA   
+  lfp            3.27042           NA       NA     NA
 \end_layout
 
 \begin_layout Plain Layout
 
-  hours         -0.000930155       NA       NA     NA   
+  hours         -0.000930155       NA       NA     NA
 \end_layout
 
 \begin_layout Plain Layout
 
-  educ           0.213255          NA       NA     NA   
+  educ           0.213255          NA       NA     NA
 \end_layout
 
 \begin_layout Plain Layout
 
-  wage76         0.535865          NA       NA     NA   
+  wage76         0.535865          NA       NA     NA
 \end_layout
 
 \begin_layout Plain Layout
 
-  hhours        -0.000272163       NA       NA     NA   
+  hhours        -0.000272163       NA       NA     NA
 \end_layout
 
 \begin_layout Plain Layout
 
-  heduc         -0.0536584         NA       NA     NA   
+  heduc         -0.0536584         NA       NA     NA
 \end_layout
 
 \begin_layout Plain Layout
 
-  hwage         -0.0766289         NA       NA     NA   
+  hwage         -0.0766289         NA       NA     NA
 \end_layout
 
 \begin_layout Plain Layout
 
-  faminc         2.65937e-05       NA       NA     NA   
+  faminc         2.65937e-05       NA       NA     NA
 \end_layout
 
 \begin_layout Plain Layout
 
-  mtr           -3.88264           NA       NA     NA   
+  mtr           -3.88264           NA       NA     NA
 \end_layout
 
 \begin_layout Plain Layout
 
-  mothereduc    -0.0481345         NA       NA     NA   
+  mothereduc    -0.0481345         NA       NA     NA
 \end_layout
 
 \begin_layout Plain Layout
@@ -1158,7 +1158,7 @@ The estimator converged after 2068 iterations and selected only 14 out of
  25 potential predictors.
  The last correlation coefficient between the final residuals and some predictor
  was found being close to zero (-0.033).
- Even though only 14 predictors are selected being relevant, the 
+ Even though only 14 predictors are selected being relevant, the
 \begin_inset Formula $R^{2}$
 \end_inset
 
@@ -1172,12 +1172,12 @@ Using the GUI
 \end_layout
 
 \begin_layout Standard
-Instead of scripting, one may access the 
+Instead of scripting, one may access the
 \family typewriter
-fsreg
+fsboost
 \family default
  procedure by means of the Gretl GUI.
- Once the package is installed and loaded, simply open the menu 
+ Once the package is installed and loaded, simply open the menu
 \begin_inset Quotes eld
 \end_inset
 
@@ -1190,7 +1190,7 @@ Model -> Other linear models -> Forward Stagewise
 \end_inset
 
 .
- This a menu window as depicted in Figure 
+ This a menu window as depicted in Figure
 \begin_inset CommandInset ref
 LatexCommand ref
 reference "fig:GUI-access-window"
@@ -1251,13 +1251,13 @@ The following public functions currently exist.
 \end_layout
 
 \begin_layout Subsection
-fsreg()
+fsboost()
 \end_layout
 
 \begin_layout Standard
-The 
+The
 \family typewriter
-fsreg()
+fsboost()
 \family default
  function marks the main function.
  The function arguments are:
@@ -1285,7 +1285,7 @@ status open
 \begin_layout Plain Layout
 
 \family typewriter
-fsreg(const series y, const list X, bundle opts[null])
+fsboost(const series y, const list X, bundle opts[null])
 \end_layout
 
 \end_inset
@@ -1294,7 +1294,7 @@ fsreg(const series y, const list X, bundle opts[null])
 \end_layout
 
 \begin_layout Standard
-Return type: 
+Return type:
 \family typewriter
 bundle
 \end_layout
@@ -1400,7 +1400,7 @@ bundle, Pass parameters for controlling the algorithm (optional)
 \end_layout
 
 \begin_layout Standard
-Return type: 
+Return type:
 \family typewriter
 bundle
 \end_layout
@@ -1413,7 +1413,7 @@ bundle
 \end_layout
 
 \begin_layout Standard
-The returned bundle includes various which are listed in Table 
+The returned bundle includes various which are listed in Table
 \begin_inset CommandInset ref
 LatexCommand ref
 reference "tab:Bundle-content-as"
@@ -1724,7 +1724,7 @@ coeff_nonzero
 
 \begin_layout Plain Layout
 k by 1 vector incl.
- the final coefficient point estimates for all selected 
+ the final coefficient point estimates for all selected
 \end_layout
 
 \end_inset
@@ -1963,11 +1963,11 @@ r2_qcorr
 \begin_inset Text
 
 \begin_layout Plain Layout
-R-square based on quadratic correlation between actual 
+R-square based on quadratic correlation between actual
 \family typewriter
 y
 \family default
- and fitted 
+ and fitted
 \family typewriter
 y
 \end_layout
@@ -1992,9 +1992,9 @@ name "tab:Bundle-content-as"
 
 \end_inset
 
-Bundle content as returned by 
+Bundle content as returned by
 \family typewriter
-fsreg()
+fsboost()
 \family default
 .
 \end_layout
@@ -2017,15 +2017,15 @@ fsreg()
 \end_layout
 
 \begin_layout Standard
-The additional parameters which can be passed by means of the 
+The additional parameters which can be passed by means of the
 \family typewriter
 opts
 \family default
- bundle to 
+ bundle to
 \family typewriter
-fsreg()
+fsboost()
 \family default
- are shown in Table 
+ are shown in Table
 \begin_inset CommandInset ref
 LatexCommand ref
 reference "tab:Parameters-which-can"
@@ -2125,7 +2125,7 @@ scalar
 \begin_inset Text
 
 \begin_layout Plain Layout
-Learning rate; 
+Learning rate;
 \begin_inset Formula $0<\epsilon<1$
 \end_inset
 
@@ -2319,7 +2319,7 @@ name "tab:Parameters-which-can"
 
 \end_inset
 
-Parameters which can be set through the optional bundle 
+Parameters which can be set through the optional bundle
 \family typewriter
 opts
 \family default
@@ -2337,17 +2337,17 @@ opts
 \end_layout
 
 \begin_layout Subsection
-print_fsreg_results()
+print_fsboost_results()
 \end_layout
 
 \begin_layout Standard
-The 
+The
 \family typewriter
-print_fsreg_results()
+print_fsboost_results()
 \family default
- function takes the resulting bundle returned by the 
+ function takes the resulting bundle returned by the
 \family typewriter
-fsreg()
+fsboost()
 \family default
  function, and prints a summary of the estimation results.
  The argument is:
@@ -2375,7 +2375,7 @@ status open
 \begin_layout Plain Layout
 
 \family typewriter
-print_fsreg_results(const bundle B)
+print_fsboost_results(const bundle B)
 \end_layout
 
 \end_inset
@@ -2384,7 +2384,7 @@ print_fsreg_results(const bundle B)
 \end_layout
 
 \begin_layout Standard
-Return type: 
+Return type:
 \family typewriter
 void
 \end_layout
@@ -2395,14 +2395,14 @@ plot_rho_values()
 
 \begin_layout Standard
 For plotting the development of the remaining correlation with the residuals,
- simply call the 
+ simply call the
 \family typewriter
 plot_rho_values()
 \family default
  function.
- It takes the resulting bundle returned by the 
+ It takes the resulting bundle returned by the
 \family typewriter
-fsreg()
+fsboost()
 \family default
  function.
  The argument is:
@@ -2439,7 +2439,7 @@ plot_rho_values(const bundle B)
 \end_layout
 
 \begin_layout Standard
-Return type: 
+Return type:
 \family typewriter
 void
 \end_layout
@@ -2450,14 +2450,14 @@ plot_coefficient_paths()
 
 \begin_layout Standard
 For plotting the development of the coefficients (coefficient paths), call
- the 
+ the
 \family typewriter
 plot_coefficient_paths()
 \family default
  function.
- It takes the resulting bundle returned by the 
+ It takes the resulting bundle returned by the
 \family typewriter
-fsreg()
+fsboost()
 \family default
  function.
  The argument is:
@@ -2494,7 +2494,7 @@ plot_coefficient_paths(const bundle B)
 \end_layout
 
 \begin_layout Standard
-Return type: 
+Return type:
 \family typewriter
 void
 \end_layout

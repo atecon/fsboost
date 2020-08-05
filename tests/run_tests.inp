@@ -3,7 +3,7 @@ clear
 
 include assertion.gfn
 
-include "./src/fsa.inp" --force
+include "./src/fsboost.inp" --force
 
 
 printf "\nInfo: All tests passed.\n"
