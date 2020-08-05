@@ -45,6 +45,7 @@ ols LHS RHS
 bundle B = fsreg(LHS, RHS)
 
 print_fsreg_results(B)      # Print estimation results
+stop
 
 list X_final = B.X_final    # Retrieve list of selected regressors
 X_final

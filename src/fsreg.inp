@@ -14,11 +14,11 @@ end function
 
 function void stdize_y_and_x (bundle *self)
     /* Demeaning series y and list X and compute associated std.-errors. */
-    
+
     matrix self.my = cdemean({self.y}, TRUE)
-    scalar self.ysd = sdc(self.my)
+    scalar self.ysd = sdc({self.y})
     matrix self.mX = cdemean({self.X_without_const}, TRUE)
-    matrix self.Xsd = sdc(self.mX)           # gives row vector
+    matrix self.Xsd = sdc({self.X_without_const})           # gives row vector
 end function
 
 

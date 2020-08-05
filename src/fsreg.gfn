@@ -194,9 +194,9 @@ return self
  </params>
 <code>/* Demeaning series y and list X and compute associated std.-errors. */
 matrix self.my = cdemean({self.y}, TRUE)
-scalar self.ysd = sdc(self.my)
+scalar self.ysd = sdc({self.y})
 matrix self.mX = cdemean({self.X_without_const}, TRUE)
-matrix self.Xsd = sdc(self.mX)           # gives row vector
+matrix self.Xsd = sdc({self.X_without_const})           # gives row vector
 </code>
 </gretl-function>
 <gretl-function name="initialize" type="void" private="1">
@@ -486,9 +486,13 @@ ols LHS RHS
 
 
 # Run estimation
-bundle B = fsreg(LHS, RHS)
+bundle opts = null
+scalar opts.eta = 0.1                  # learning rate
+scalar opts.max_num_iterations = 5000   # max. number of boosting rounds
+bundle B = fsreg(LHS, RHS, opts)
 
 print_fsreg_results(B)      # Print estimation results
+stop
 
 list X_final = B.X_final    # Retrieve list of selected regressors
 X_final
