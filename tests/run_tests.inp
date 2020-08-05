@@ -6,4 +6,144 @@ include assertion.gfn
 include "./src/fsboost.inp" --force
 
 
+function void test_default_fsreg_opts (void)
+    print "Start testing default_fsreg_opts()"
+
+    bundle B = default_fsreg_opts()
+
+    assert_equal_num(nelem(B), 4)
+    assert_equal_num(B.verbose, 1)
+    assert_equal_num(B.eta, 0.05)
+    assert_equal_num(B.max_num_iterations, 10000)
+    assert_equal_num(B.early_stopping_rounds, 50)
+end function
+test_default_fsreg_opts()
+
+
+open denmark.gdt -q -p
+list L = LRY IBO const
+function void test_initialize (const series y, const list L)
+    print "Start testing initialize()"
+
+    bundle B = null
+    strings B.Xnames = varnames(L)
+    scalar B.max_num_iterations = 10000
+    initialize(&B, y, L)
+
+    assert_true(inbundle(B, "T"))
+    assert_true(inbundle(B, "y"))
+    assert_true(inbundle(B, "X_wo_constant"))
+    assert_true(inbundle(B, "with_constant"))
+    assert_true(inbundle(B, "Xnames_wo_constant"))
+    assert_true(inbundle(B, "resid_mean"))
+    assert_true(inbundle(B, "rho_values"))
+    assert_true(inbundle(B, "betas"))
+    assert_true(inbundle(B, "actual_num_iterations"))
+
+    assert_equal_num(B.T, $nobs)
+    assert_true(B.with_constant)
+    assert_equal_num(nelem(B.X_wo_constant), nelem(L)-1)
+    assert_equal_num(B.resid_mean, 0)
+    assert_false(ok(B.actual_num_iterations))
+    assert_equal_num(cols(B.rho_values), 1)
+    assert_equal_num(rows(B.rho_values), B.max_num_iterations)
+    assert_equal_num(rows(B.betas), B.max_num_iterations)
+    assert_equal_num(cols(B.betas), nelem(B.X_wo_constant))
+end function
+test_initialize(LRM, L)
+
+
+open denmark.gdt -q -p
+list L = LRY IBO const
+function void test_stdize_y_and_x (const series y, const list L)
+    print "Start testing stdize_y_and_x()"
+
+    bundle B = null
+    series B.y = y
+    list B.X_wo_constant = L
+
+    stdize_y_and_x(&B)
+
+    assert_true(inbundle(B, "my"))
+    assert_true(inbundle(B, "mX"))
+    assert_true(inbundle(B, "y"))
+    assert_true(inbundle(B, "X_wo_constant"))
+    assert_true(inbundle(B, "ysd"))
+    assert_true(inbundle(B, "Xsd"))
+
+    assert_almost_equal_num(B.ysd, 0.150966)
+end function
+test_stdize_y_and_x(LRM, L)
+
+
+function void test_get_max_correlation (void)
+    print "Start testing get_max_correlation()"
+
+    # 1st draw
+    set seed 1234
+    matrix yX = mnormal(100, 12)
+    scalar pos = 0
+
+    scalar rho = get_max_correlation(yX, &pos)
+    assert_equal_num(pos, 2)
+    assert_almost_equal_num(rho, 0.15986581)
+
+    # 2nd draw
+    set seed 4321
+    matrix yX = mnormal(100, 12)
+    scalar pos = 0
+
+    scalar rho = get_max_correlation(yX, &pos)
+    assert_equal_num(pos, 11)
+    assert_almost_equal_num(rho, 0.17891685)
+end function
+test_get_max_correlation()
+
+
+function void test_print_iteration_details (void)
+    print "Start testing print_iteration_details()"
+
+    bundle B = null
+    B.verbose = 2
+    B.max_num_iterations = 10
+
+    print_iteration_details(B, 4, 0.11)
+end function
+test_print_iteration_details()
+
+
+function void test_forward_stagewise (void)
+    print "Start testing forward_stagewise()"
+
+    bundle B = null
+    scalar B.eta = 0.1
+    scalar rho = 0.5
+    scalar eta_new = forward_stagewise(B, rho)
+    assert_equal_num(eta_new, 0.1)
+
+    bundle B = null
+    scalar B.eta = 0.1
+    scalar rho = -0.5
+    scalar eta_new = forward_stagewise(B, rho)
+    assert_equal_num(eta_new, -0.1)
+
+    bundle B = null
+    scalar B.eta = 0.1
+    scalar rho = 0
+    scalar eta_new = forward_stagewise(B, rho)
+    assert_equal_num(eta_new, 0)
+end function
+test_forward_stagewise()
 printf "\nInfo: All tests passed.\n"
+
+
+function void test_update_beta (void)
+    print "Start testing update_beta()"
+
+    scalar beta = 1
+    scalar delta = 2
+    scalar beta_new = update_beta(1, 2)
+
+    assert_equal_num(beta_new, 3)
+end function
+test_update_beta()

@@ -1,5 +1,4 @@
-function bundle default_fsreg_opts (const series y,
-                                    const list X)
+function bundle default_fsreg_opts (void)
 
     # Set default values
     bundle self = null
@@ -17,8 +16,8 @@ function void stdize_y_and_x (bundle *self)
 
     matrix self.my = cdemean({self.y}, TRUE)
     scalar self.ysd = sdc({self.y})
-    matrix self.mX = cdemean({self.X_without_const}, TRUE)
-    matrix self.Xsd = sdc({self.X_without_const})           # gives row vector
+    matrix self.mX = cdemean({self.X_wo_constant}, TRUE)
+    matrix self.Xsd = sdc({self.X_wo_constant})           # gives row vector
 end function
 
 
@@ -27,14 +26,14 @@ function void initialize (bundle *self, const series y, const list X)
 
     scalar self.T = $nobs
     series self.y = y
-    list self.X_without_const = X - const
-    scalar self.with_constant = nelem(self.X_without_const) < nelem(X) ? TRUE : FALSE
+    list self.X_wo_constant = X - const
+    scalar self.with_constant = nelem(self.X_wo_constant) < nelem(X) ? TRUE : FALSE
     strings self.Xnames_wo_constant = (self.with_constant == TRUE) ? strdrop(self.Xnames, "const") : self.Xnames
 
     # Initializations of variables for estimator function
     scalar self.resid_mean = 0
     matrix self.rho_values = mshape(NA, self.max_num_iterations, 1)
-    matrix self.betas = zeros(self.max_num_iterations, nelem(self.X_without_const))
+    matrix self.betas = zeros(self.max_num_iterations, nelem(self.X_wo_constant))
     scalar self.actual_num_iterations = NA
 end function
 
@@ -82,7 +81,7 @@ function bundle fsreg (const series y "Dep. variable",
         smpl --contiguous y X
     endif
 
-    bundle self = default_fsreg_opts(y, X)
+    bundle self = default_fsreg_opts()
     if exists(opts)
         self = opts + self         # override defaults
     endif
@@ -97,7 +96,7 @@ function bundle fsreg (const series y "Dep. variable",
     post_process(&self)
 
     # Handle intercept: non-scaled as "coeff" is already re-scaled
-    matrix resids = get_residuals({y}, {self.X_without_const}, self.coeff)
+    matrix resids = get_residuals({y}, {self.X_wo_constant}, self.coeff)
     if self.with_constant
         scalar self.resid_mean = meanc(resids)
         self.coeff = self.resid_mean | self.coeff
@@ -164,7 +163,7 @@ function void cleanup_bundle (bundle *self)
     delete self.y
     delete self.my
     delete self.num_parameters
-    delete self.X_without_const
+    delete self.X_wo_constant
     delete self.resid_mean
 end function
 
