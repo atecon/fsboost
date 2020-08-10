@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <gretl-functions>
-<gretl-function-package name="fsreg" minver="2020b" lives-in-subdir="true">
+<gretl-function-package name="fsboost" minver="2020b" lives-in-subdir="true">
 <author email="atecon@posteo.de">Artur Tarassow</author>
 <version>0.1</version>
 <date>2020-08-03</date>
-<description>Forward-stagewise sparse regression estimates</description>
+<description>Forward-stagewise boosted regression estimates</description>
 <tags>C13 C52</tags>
 <label>Forward Stagewise</label>
 <menu-attachment>MAINWIN/Model/LinearModels</menu-attachment>
 <help>
-pdfdoc:fsreg.pdf
+pdfdoc:fsboost.pdf
 </help>
 <depends count="2">
 ridge string_utils </depends>
@@ -24,13 +24,13 @@ ridge string_utils </depends>
   </param>
   <param name="opts" type="bundle" optional="true"/>
  </params>
-<code>/* Main function for forward stagewise regression. */
+<code>/* Main function for forward stagewise boosted regression. */
 if $datatype != 1       # cross-sectional or panel
   smpl --no-missing y X
 elif $datatype == 2
   smpl --contiguous y X
 endif
-bundle self = default_fsreg_opts(y, X)
+bundle self = default_fsreg_opts()
 if exists(opts)
   self = opts + self         # override defaults
 endif
@@ -42,7 +42,7 @@ stdize_y_and_x(&amp;self)
 fsreg_estimator(&amp;self)
 post_process(&amp;self)
 # Handle intercept: non-scaled as &quot;coeff&quot; is already re-scaled
-matrix resids = get_residuals({y}, {self.X_without_const}, self.coeff)
+matrix resids = get_residuals({y}, {self.X_wo_constant}, self.coeff)
 if self.with_constant
   scalar self.resid_mean = meanc(resids)
   self.coeff = self.resid_mean | self.coeff
@@ -71,6 +71,9 @@ if self.verbose
   matrix extra = self.actual_num_iterations |self.rho_values[self.actual_num_iterations] | sd(self.uhat) | self.r2_qcorr
   scalar k = rows(self.coeff_nonzero)
   matrix bhat = self.coeff_nonzero ~ mshape(NA, k, 1)
+  eval bhat
+  eval label_str
+  eval extra
   modprint bhat label_str extra
 endif
 </code>
@@ -175,10 +178,6 @@ return model
 </code>
 </gretl-function>
 <gretl-function name="default_fsreg_opts" type="bundle" private="1">
- <params count="2">
-  <param name="y" type="series" const="true"/>
-  <param name="X" type="list" const="true"/>
- </params>
 <code># Set default values
 bundle self = null
 scalar self.verbose = 1
@@ -195,8 +194,8 @@ return self
 <code>/* Demeaning series y and list X and compute associated std.-errors. */
 matrix self.my = cdemean({self.y}, TRUE)
 scalar self.ysd = sdc({self.y})
-matrix self.mX = cdemean({self.X_without_const}, TRUE)
-matrix self.Xsd = sdc({self.X_without_const})           # gives row vector
+matrix self.mX = cdemean({self.X_wo_constant}, TRUE)
+matrix self.Xsd = sdc({self.X_wo_constant})           # gives row vector
 </code>
 </gretl-function>
 <gretl-function name="initialize" type="void" private="1">
@@ -208,13 +207,13 @@ matrix self.Xsd = sdc({self.X_without_const})           # gives row vector
 <code>/* Some initalizations. */
 scalar self.T = $nobs
 series self.y = y
-list self.X_without_const = X - const
-scalar self.with_constant = nelem(self.X_without_const) &lt; nelem(X) ? TRUE : FALSE
+list self.X_wo_constant = X - const
+scalar self.with_constant = nelem(self.X_wo_constant) &lt; nelem(X) ? TRUE : FALSE
 strings self.Xnames_wo_constant = (self.with_constant == TRUE) ? strdrop(self.Xnames, &quot;const&quot;) : self.Xnames
 # Initializations of variables for estimator function
 scalar self.resid_mean = 0
 matrix self.rho_values = mshape(NA, self.max_num_iterations, 1)
-matrix self.betas = zeros(self.max_num_iterations, nelem(self.X_without_const))
+matrix self.betas = zeros(self.max_num_iterations, nelem(self.X_wo_constant))
 scalar self.actual_num_iterations = NA
 </code>
 </gretl-function>
@@ -265,7 +264,7 @@ delete self.mX
 delete self.y
 delete self.my
 delete self.num_parameters
-delete self.X_without_const
+delete self.X_wo_constant
 delete self.resid_mean
 </code>
 </gretl-function>
@@ -444,7 +443,7 @@ return selected_vars
 <sample-script>
 set verbose off
 clear
-include fsreg.gfn
+include fsboost.gfn
 
 
 scalar runEX = 3		# select an example
@@ -486,13 +485,9 @@ ols LHS RHS
 
 
 # Run estimation
-bundle opts = null
-scalar opts.eta = 0.1                  # learning rate
-scalar opts.max_num_iterations = 5000   # max. number of boosting rounds
-bundle B = fsreg(LHS, RHS, opts)
+bundle B = fsreg(LHS, RHS)
 
 print_fsreg_results(B)      # Print estimation results
-stop
 
 list X_final = B.X_final    # Retrieve list of selected regressors
 X_final

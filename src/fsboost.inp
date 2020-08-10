@@ -386,6 +386,10 @@ function void print_fsreg_results (bundle self)
         scalar k = rows(self.coeff_nonzero)
         matrix bhat = self.coeff_nonzero ~ mshape(NA, k, 1)
 
+        eval bhat
+        eval label_str
+        eval extra
+
         modprint bhat label_str extra
     endif
 end function
