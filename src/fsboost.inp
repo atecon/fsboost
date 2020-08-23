@@ -320,9 +320,9 @@ function void plot_coefficient_paths (bundle self,
     cnameset(mplot, self.Xnames)
 
     plot mplot
-        options with-lines time-series single-yaxis @ylog_scale_str
+        options with-lp time-series single-yaxis @ylog_scale_str
         #literal set linetype 3 lc rgb "#0000ff"
-        #literal set nokey
+        literal set key right outside
         literal set grid
         printf "set title \"%s\" font \", %d\"", title, fontsize
         printf "set xlabel 'Iterations' font \", %d\"", fontsize
@@ -338,14 +338,14 @@ function void plot_rho_values (bundle self,
     /* Plot correlation coefficients. */
 
     string title = "Forward stagewise correlation values"
-    string ylabel = (absolute_values == FALSE) ? "Correlations w. residuals" : "Absol. correlations w. residuals"
+    string ylabel = (absolute_values == FALSE) ? "Correlations w. residuals" : "Absolute correlations w. residuals"
     scalar fontsize = 12
     string filename = (exists(filename)) ? filename : "display"
     matrix mplot = (absolute_values == TRUE) ? abs(self.rho_values) : self.rho_values
 
     plot mplot
         options with-lines time-series
-        literal set linetype 1 lc rgb "black" lw 1.5
+        literal set linetype 1 lc rgb "black" lw 1
         literal set nokey
         literal set grid
         printf "set title \"%s\" font \", %d\"", title, fontsize

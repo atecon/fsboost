@@ -88,13 +88,13 @@ endif
  </params>
 <code>/* Plot correlation coefficients. */
 string title = &quot;Forward stagewise correlation values&quot;
-string ylabel = (absolute_values == FALSE) ? &quot;Correlations w. residuals&quot; : &quot;Absol. correlations w. residuals&quot;
+string ylabel = (absolute_values == FALSE) ? &quot;Correlations w. residuals&quot; : &quot;Absolute correlations w. residuals&quot;
 scalar fontsize = 12
 string filename = (exists(filename)) ? filename : &quot;display&quot;
 matrix mplot = (absolute_values == TRUE) ? abs(self.rho_values) : self.rho_values
 plot mplot
   options with-lines time-series
-  literal set linetype 1 lc rgb &quot;black&quot; lw 1.5
+  literal set linetype 1 lc rgb &quot;black&quot; lw 1
   literal set nokey
   literal set grid
   printf &quot;set title \&quot;%s\&quot; font \&quot;, %d\&quot;&quot;, title, fontsize
@@ -120,9 +120,9 @@ string ylog_scale_str = (ylog_scale == TRUE) ? &quot;--ylogscale=10&quot; : &quo
 matrix mplot = self.betas
 cnameset(mplot, self.Xnames)
 plot mplot
-  options with-lines time-series single-yaxis @ylog_scale_str
+  options with-lp time-series single-yaxis @ylog_scale_str
   #literal set linetype 3 lc rgb &quot;#0000ff&quot;
-  #literal set nokey
+  literal set key right outside
   literal set grid
   printf &quot;set title \&quot;%s\&quot; font \&quot;, %d\&quot;&quot;, title, fontsize
   printf &quot;set xlabel 'Iterations' font \&quot;, %d\&quot;&quot;, fontsize
@@ -499,7 +499,7 @@ eval B.coeff_nonzero    # retrieve point estimates of selected variables
 series yhat = B.yhat    # Retrieve fitted values
 
 # Plot realizations vs. fitted values
-gnuplot LHS yhat --output=&quot;display&quot;
+#gnuplot LHS yhat --output=&quot;display&quot;
 
 # Plot correlations as a function of iterations
 plot_rho_values(B)

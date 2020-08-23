@@ -56,7 +56,7 @@ eval B.coeff_nonzero    # retrieve point estimates of selected variables
 series yhat = B.yhat    # Retrieve fitted values
 
 # Plot realizations vs. fitted values
-gnuplot LHS yhat --output="display"
+#gnuplot LHS yhat --output="display"
 
 # Plot correlations as a function of iterations
 plot_rho_values(B)
