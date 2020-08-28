@@ -3,7 +3,7 @@ function bundle default_fsreg_opts (void)
     # Set default values
     bundle self = null
     scalar self.verbose = 1
-    scalar self.eta = 0.05         # kind of learning rate
+    scalar self.learning_rate = 0.05
     scalar self.max_num_iterations = 10000
     scalar self.early_stopping_rounds = 50
 
@@ -17,7 +17,7 @@ function void stdize_y_and_x (bundle *self)
     matrix self.my = cdemean({self.y}, TRUE)
     scalar self.ysd = sdc({self.y})
     matrix self.mX = cdemean({self.X_wo_constant}, TRUE)
-    matrix self.Xsd = sdc({self.X_wo_constant})           # gives row vector
+    matrix self.Xsd = sdc({self.X_wo_constant})
 end function
 
 
@@ -40,7 +40,7 @@ end function
 
 function bundle fsreg_gui (const series y "Dep. variable",
                            const list X "Candidates",
-                           const scalar eta[0.0001:0.9999:0.05] "Learning rate",
+                           const scalar learning_rate[0.0001:0.9999:0.05] "Learning rate",
                            const int max_num_iterations[20::2000] "Max. number of iterations",
                            const int early_stopping_rounds[10::30] "Early stopping rounds",
                            const bool plot_coefficient_paths[0] "Plot coefficient paths",
@@ -50,7 +50,7 @@ function bundle fsreg_gui (const series y "Dep. variable",
 
     bundle model = null
     scalar model.verbose = verbose
-    scalar model.eta = eta
+    scalar model.learning_rate = learning_rate
     scalar model.max_num_iterations = max_num_iterations
     scalar model.early_stopping_rounds = early_stopping_rounds
 
@@ -73,11 +73,11 @@ function bundle fsreg (const series y "Dep. variable",
                        const list X "Candidates",
                        bundle opts[null])
 
-    /* Main function for forward stagewise boosted regression. */
+    /* Main function for forward-stagewise boosted regression. */
 
-    if $datatype != 1       # cross-sectional or panel
+    if $datatype != 2       # cross-sectional or panel
         smpl --no-missing y X
-    elif $datatype == 2
+    else                    # time-series case
         smpl --contiguous y X
     endif
 
@@ -105,11 +105,11 @@ function bundle fsreg (const series y "Dep. variable",
 
     attach_coefficient_row_labels(&self)
 
-    # FIXME: I could not found how to determine the degrees of freedom for fsreg estimator
-    scalar self.num_parameters = rows(vec(self.coeff_nonzero))
+    scalar self.ncoeff = rows(vec(self.coeff_nonzero))
 
     add_yhat_and_uhat_to_bundle(y, X, &self)
-    scalar self.uhat_variance = sd(self.uhat)
+    add_sd_of_uhat(&self)
+    add_first_order_residual_corr(&self)
     compute_r_squares(&self)
 
     list self.X_final = add_selected_predictors_to_list(X, self)
@@ -120,8 +120,25 @@ function bundle fsreg (const series y "Dep. variable",
 end function
 
 
+function void add_sd_of_uhat (bundle *self)
+  /* Standard deviation of residuals */
+
+  scalar self.uhat_variance = sd(self.uhat)
+end function
+
+function void add_first_order_residual_corr (bundle *self)
+  /* First order serial correlation coefficient. */
+
+  matrix muhat = {self.uhat}
+  muhat ~= mlag(muhat, 1)
+
+  scalar self.uhat_first_order_corr = mcorr(muhat)[1,2]
+end function
+
+
+
 function list add_selected_predictors_to_list (const list X, const bundle self)
-    /* Add selected preditors to list. */
+    /* Add active set of predictors to list. */
 
     list L = (self.with_constant == TRUE) ? const : null
     S = get_names_of_nonzero_coeffs(self)
@@ -145,11 +162,13 @@ end function
 
 
 function void compute_r_squares (bundle *self)
-    /* Wrapper calling functions for computing R^2. Currently, we only know that stuff is statistically correct for statistics "r2_qcorr". */
+    /* Wrapper calling functions for computing R^2.
+    Function r2_stats() is taken from the "ridge" package.
+    TODO: Currently, we only know that stuff is statistically applicable for statistics "r2_qcorr". */
 
-    matrix r_squares = r2_stats(self.my, {self.yhat}, self.num_parameters)
+    matrix r_squares = r2_stats(self.my, {self.yhat}, self.ncoeff)
     self.r2_qcorr = r_squares[1]
-    #self.r2_qcorr_adj = r_squares[2]          # depends on self.num_parameters
+    #self.r2_qcorr_adj = r_squares[2]          # depends on self.ncoeff
     #self.r2_scores = r_squares[3]
 end function
 
@@ -162,7 +181,7 @@ function void cleanup_bundle (bundle *self)
     delete self.mX
     delete self.y
     delete self.my
-    delete self.num_parameters
+    #delete self.ncoeff
     delete self.X_wo_constant
     delete self.resid_mean
 end function
@@ -171,11 +190,10 @@ end function
 function void attach_coefficient_row_labels (bundle *self)
     /* Attach row labels to vector of point estimates. */
 
-    if self.with_constant
-        S = defarray("const") + get_names_of_nonzero_coeffs(self)
-    else
-        S = get_names_of_nonzero_coeffs(self)
-    endif
+    strings S = array(0)
+
+    S = (self.with_constant == TRUE) ? defarray("const") : S
+    strings S += get_names_of_nonzero_coeffs(self)
     rnameset(self.coeff_nonzero, S)
     rnameset(self.coeff, self.Xnames)
 end function
@@ -225,7 +243,7 @@ end function
 function scalar forward_stagewise (const bundle self,
                                    const scalar rho "Correlation coefficient")
     /* Compute forward stagewise "delta" value. */
-    return self.eta * sgn(rho)
+    return self.learning_rate * sgn(rho)
 end function
 
 
@@ -381,14 +399,15 @@ function void print_fsreg_results (bundle self)
     if self.verbose
         printf "\nForward-stagewise regression results (no inference)"
         printf "\n-------------------------------------------------------\n"
-        strings label_str = defarray("const") + get_names_of_nonzero_coeffs(self) + defarray("Number of iterations", "Correl. w. residuals", "S.E. of regression", "R-squared")
+        strings label_str = defarray("const") + get_names_of_nonzero_coeffs(self) + defarray("Number of iterations", "Correl. w. residuals", "S.E. of regression", "R-squared", "rho")
         matrix extra = self.actual_num_iterations |self.rho_values[self.actual_num_iterations] | sd(self.uhat) | self.r2_qcorr
-        scalar k = rows(self.coeff_nonzero)
-        matrix bhat = self.coeff_nonzero ~ mshape(NA, k, 1)
 
-        eval bhat
-        eval label_str
-        eval extra
+        if $datatype == 2
+          matrix extra |= self.uhat_first_order_corr
+        endif
+
+        scalar k = self.ncoeff
+        matrix bhat = self.coeff_nonzero ~ mshape(NA, k, 1)
 
         modprint bhat label_str extra
     endif
