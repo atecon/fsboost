@@ -13,6 +13,9 @@ if runEX == 1
     series LHS = ldiff(PAU)
     list RHS = const LHS(-1 to -2) IUS(-1 to -2)  IAU(-1 to -2)
 
+    # Optional: set learning rate
+    bundle opts = defbundle("learning_rate", 0.05)
+
 elif runEX == 2
     # SIMULATION
     nulldata 750
@@ -28,26 +31,59 @@ elif runEX == 2
         RHS += genseries(sprintf("S%d", $i), X[,i])
     endloop
 
+    bundle opts = null
+
 elif runEX == 3
     open mroz.gdt -q -p     # cross-sectional data set
+
     series LHS = wage
     list RHS = const dataset
+    RHS -= LHS wage     # drop lhs varianbe
 
-    RHS -= LHS wage     # drop lhs varianle
+    # Set a low learning rate
+    bundle opts = defbundle("learning_rate", 0.0002)
+
+elif runEX == 4             # example taken from Allin's regls pckg.
+
+    # An artificial example with more regressors than observations,
+    # where the actually relevant regressors are known. With an s
+    # value (lambda/lambda-max) of around 0.3, ADMM is pretty good
+    # at picking out the relevant ones. Note that no seed is set, so
+    # results will differ somewhat from run to run.
+
+    n = 80  # observations
+    k = 120 # regressors
+    matrix X = mnormal(n,k)
+    u = mnormal(n, 1)
+    matrix sel = {5, 20, 37, 60, 70}
+    matrix y = sumr(X[,sel]) + u
+    printf "Truly non-zero coefficients:\n"
+    eval sel
+
+    nulldata n --preserve
+    series LHS = y
+    list RHS = null
+    loop i=1..k -q
+      RHS += genseries(sprintf("x%d", i), X[,i])
+    endloop
+
+    # Set a low learning rate
+    bundle opts = defbundle("learning_rate", 0.0002)
 endif
 
 # Run standard OLS as benchmark
-ols LHS RHS
-
+if nelem(RHS) < $nobs
+    ols LHS RHS
+endif
 
 
 # Run estimation
-bundle B = fsreg(LHS, RHS)
-
-print_fsreg_results(B)      # Print estimation results
+bundle B = fsreg(LHS, RHS, opts)
+#print B
+print_fsboost_results(B)      # Print estimation results
 
 list X_final = B.X_final    # Retrieve list of selected regressors
-X_final
+eval varnames(X_final)
 
 # Retrieve point estimates
 eval B.coeff            # retrieve point estimates of all variables
@@ -59,17 +95,22 @@ series yhat = B.yhat    # Retrieve fitted values
 #gnuplot LHS yhat --output="display"
 
 # Plot correlations as a function of iterations
-plot_rho_values(B)
+#plot_rho_values(B)
 
 # Plot coefficient paths
 plot_coefficient_paths(B)
+
+# Prediction
+smpl 1 10
+matrix preds = fsboost_predict(RHS, B)
+print preds
 
 
 /* Activate if wished
 # Define own parameter set
 bundle opts = null
 scalar opts.verbose = 1
-scalar opts.eta = 0.001                  # learning rate
+scalar opts.learning_rate = 0.001                  # learning rate
 scalar opts.max_num_iterations = 5000   # max. number of boosting rounds
 scalar opts.early_stopping_rounds = 20  # stop if no improvement after n rounds
 

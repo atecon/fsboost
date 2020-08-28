@@ -4,6 +4,7 @@ clear
 include assertion.gfn
 
 include "./src/fsboost.inp" --force
+include ridge.gfn --force
 
 
 function void test_default_fsreg_opts (void)
@@ -13,7 +14,7 @@ function void test_default_fsreg_opts (void)
 
     assert_equal_num(nelem(B), 4)
     assert_equal_num(B.verbose, 1)
-    assert_equal_num(B.eta, 0.05)
+    assert_equal_num(B.learning_rate, 0.025)
     assert_equal_num(B.max_num_iterations, 10000)
     assert_equal_num(B.early_stopping_rounds, 50)
 end function
@@ -116,19 +117,19 @@ function void test_forward_stagewise (void)
     print "Start testing forward_stagewise()"
 
     bundle B = null
-    scalar B.eta = 0.1
+    scalar B.learning_rate = 0.1
     scalar rho = 0.5
     scalar eta_new = forward_stagewise(B, rho)
     assert_equal_num(eta_new, 0.1)
 
     bundle B = null
-    scalar B.eta = 0.1
+    scalar B.learning_rate = 0.1
     scalar rho = -0.5
     scalar eta_new = forward_stagewise(B, rho)
     assert_equal_num(eta_new, -0.1)
 
     bundle B = null
-    scalar B.eta = 0.1
+    scalar B.learning_rate = 0.1
     scalar rho = 0
     scalar eta_new = forward_stagewise(B, rho)
     assert_equal_num(eta_new, 0)
@@ -147,3 +148,106 @@ function void test_update_beta (void)
     assert_equal_num(beta_new, 3)
 end function
 test_update_beta()
+
+
+open denmark.gdt -q -p
+function void test_add_sd_of_uhat (const series y)
+    print "Start testing add_sd_of_uhat()"
+
+    bundle B = defbundle("uhat", y)
+    add_sd_of_uhat(&B)
+
+    assert_almost_equal_num(B.uhat_variance, 0.152357, 1e-5)
+end function
+test_add_sd_of_uhat(LRM)
+
+
+open denmark.gdt -q -p
+function void test_add_first_order_residual (const series y)
+    print "Start testing add_first_order_residual_corr()"
+
+    bundle B = defbundle("uhat", y)
+    add_first_order_residual_corr(&B)
+
+    assert_almost_equal_num(B.uhat_first_order_corr, 0.199667, 1e-6)
+end function
+test_add_first_order_residual(LRM)
+
+
+open denmark.gdt -q -p
+list L = dataset
+function void test_fsboost_predict (const list L)
+    print "Start testing fsboost_predict()"
+
+    # Without intercept, number of regressors correct
+    bundle B = null
+    scalar B.with_constant = FALSE
+    matrix B.coeff = {1, 1, 0}
+    smpl 1 5
+    list X = IDE LRY IBO
+    matrix pred = fsboost_predict(X, B)
+
+    assert_almost_equal_num(pred[1], 5.9977, 1e-4)
+    assert_almost_equal_num(pred[2], 5.9693, 1e-4)
+    assert_almost_equal_num(pred[3], 5.9333, 1e-4)
+    assert_almost_equal_num(pred[4], 5.9078, 1e-4)
+    assert_almost_equal_num(pred[5], 5.8924, 1e-4)
+
+
+    # Without intercept, number of regressors wrong
+    bundle B = null
+    scalar B.with_constant = FALSE
+    matrix B.coeff = {1, 1, 0, 1}
+    smpl 1 5
+    list X = IDE LRY IBO
+    matrix pred = fsboost_predict(X, B)
+
+    assert_false(ok(pred)[1])
+
+    # Without intercept, number of regressors correct but coefficient
+    # vector to long
+    bundle B = null
+    scalar B.with_constant = FALSE
+    matrix B.coeff = {1, 1, 0, 1}
+    smpl 1 5
+    list X = IDE LRY IBO
+    matrix pred = fsboost_predict(X, B)
+
+    assert_false(ok(pred)[1])
+
+
+    # With intercept, number of regressors correct
+    bundle B = null
+    scalar B.with_constant = TRUE
+    matrix B.coeff = {0.5, 1, 1, 0}
+    smpl 1 5
+    list X = IDE LRY IBO
+    matrix pred = fsboost_predict(X, B)
+
+    assert_almost_equal_num(pred[1], 6.4977, 1e-4)
+    assert_almost_equal_num(pred[2], 6.4693, 1e-4)
+    assert_almost_equal_num(pred[3], 6.4333, 1e-4)
+    assert_almost_equal_num(pred[4], 6.4078, 1e-4)
+    assert_almost_equal_num(pred[5], 6.3924, 1e-4)
+end function
+test_fsboost_predict(L)
+
+
+
+/* CURRENTLY NOT TESTABLE AS r2_stats() called by compute_r_squares() is part of the ridge package. Just an "include ridge.gfn" is not sufficient. Why?
+open denmark.gdt -q -p
+function void test_compute_r_squares (const matrix y,
+                                      const matrix x)
+    print "Start testing compute_r_squares()"
+
+    bundle B = null
+    matrix B.my = y
+    matrix B.yhat = x
+    scalar B.ncoeff = 5
+
+    compute_r_squares(&B)
+    assert_equal_num(nelem(B), 4)
+    assert_true(inbundle(B, "r2_qcorr"))
+end function
+test_compute_r_squares({LRM}, {LRY})
+*/

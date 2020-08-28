@@ -85,9 +85,9 @@
 \begin_layout Title
 The Gretl
 \family typewriter
-fsboost
+ fsboost
 \family default
- function package for running the forward stagewise regression
+ function package for running forward stagewise regressions
 \end_layout
 
 \begin_layout Author
@@ -96,6 +96,18 @@ LatexCommand href
 name "Artur Tarassow"
 target "atecon@posteo.de"
 type "mailto:"
+literal "false"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Address
+\begin_inset CommandInset href
+LatexCommand href
+name "Github project page"
+target "https://github.com/atecon/fsboost/"
 literal "false"
 
 \end_inset
@@ -164,52 +176,86 @@ Introduction
 
 \begin_layout Standard
 Selecting the relevant predictors among a many potential ones is a crucial
- task.
+ task when working with numerous potentially relevant predictors.
  Neglecting relevant predictors may lead to inconsistent parameter estimates
- while considering irrelevant regressors yields an inefficient estimator.
- Furthermore, considering highly correlated predictors into a standard least
- square regression most probably suffers from multicollinearity issues.
+ while considering irrelevant regressors may yield and inefficient estimator.
+ Furthermore, considering highly correlated predictors within a standard
+ least square regression setting most probably suffers from multicollinearity
+ issues.
  Lastly, standard least squares cannot handle the case when the number of
- observations,
+ observations, 
 \begin_inset Formula $T$
 \end_inset
 
-, exceeds the number of potential regressors,
+, exceeds the number of potential regressors, 
 \begin_inset Formula $k$
 \end_inset
 
 .
-
 \end_layout
 
 \begin_layout Standard
 So called shrinkage and/ or selection estimators such as Ridge or Lasso
- among others, are known to handle such issues.
+ among others, are known to handle such issues by imposing an additional
+ restriction to an otherwise ordinary least square setting.
  Another estimation approach marks the so called forward stagewise regression
- approach (fsboost henceforth).
- fsboost follows a simple strategy for constructing a sequence of sparse regressio
-n estimates: Initially set all coefficients to zero, and iteratively update
+ approach (
+\emph on
+fsboost
+\emph default
+ henceforth).
+\end_layout
+
+\begin_layout Standard
+
+\emph on
+fsboost
+\emph default
+ follows a simple strategy for constructing a sequence of sparse regression
+ estimates: Initially set all coefficients to zero, and iteratively update
  the coefficient (by a small amount, depending on the
 \emph on
-learning rate
+ learning rate 
 \begin_inset Formula $\epsilon$
 \end_inset
 
 
 \emph default
-) of the variable that achieves the maximal absolute correlation with the
- current residual.
+) of the variable that achieves the (under quadratic loss) maximal absolute
+ correlation with the current residual.
 
 \emph on
  Learning
 \emph default
- from the residuals has some connection to Boosting.
- However, this procedure also has some interesting connection to the Lasso
- under some conditions (REFs).
- As the step size goes to zero, the sequence of forward stagewise estimates
- exactly coincides with the lasso path.
- While, this equivalence holds outside of least squares regression, currently
- we only support minimization of squared loss (RMSE).
+ from the residuals has some connection to an approach named 
+\emph on
+boosting
+\emph default
+ in the machine-learning community.
+ However, the 
+\emph on
+fsboost
+\emph default
+ procedure also has some interesting connection to the Lasso under some
+ conditions (Hastie et al.
+ 2007).
+ As 
+\begin_inset Formula $\varepsilon\rightarrow0$
+\end_inset
+
+ the sequence of forward stagewise estimates exactly coincides with the
+ lasso path.
+ While, this equivalence holds outside of least squares regression (Tibshirani,
+ 2015), currently we only support minimization of squared loss (RMSE).
+\end_layout
+
+\begin_layout Standard
+Furthermore, as shown by Tibshirani, the 
+\emph on
+fsboost
+\emph default
+ algorithm also covers the Poisson or logistics regression losses.
+ These cases may be covered in future versions of this package.
 \end_layout
 
 \begin_layout Section
@@ -223,7 +269,7 @@ status open
 
 \begin_layout Plain Layout
 Also note, that this is analogous to least squares boosting, with the number
- of trees equal to the number of predictors predictors.
+ of trees equal to the number of predictors.
 \end_layout
 
 \end_inset
@@ -232,11 +278,11 @@ Also note, that this is analogous to least squares boosting, with the number
 \end_layout
 
 \begin_layout Enumerate
-Start with
+Start with 
 \begin_inset Formula $r=y$
 \end_inset
 
- and
+ and 
 \begin_inset Formula $\beta_{1}=\beta_{2}=\ldots=\beta_{k}=0$
 \end_inset
 
@@ -248,7 +294,7 @@ Find the predictor
 \begin_inset Formula $x_{j}$
 \end_inset
 
- most correlated with
+ most correlated with 
 \begin_inset Formula $r$
 \end_inset
 
@@ -260,7 +306,7 @@ Update the
 \begin_inset Formula $j$
 \end_inset
 
--th predictor
+-th predictor 
 \begin_inset Formula $\beta_{j}^{i}\leftarrow\beta_{j}^{i-1}+\delta_{j}$
 \end_inset
 
@@ -272,7 +318,7 @@ Update the
 \end_layout
 
 \begin_layout Enumerate
-Update the residuals
+Update the residuals 
 \begin_inset Formula $r^{i}\leftarrow r^{i-1}-\delta_{j}\times x_{j}$
 \end_inset
 
@@ -280,7 +326,7 @@ Update the residuals
 \end_layout
 
 \begin_layout Standard
-Here
+Here 
 \begin_inset Formula $y$
 \end_inset
 
@@ -300,55 +346,54 @@ Here
 \begin_inset Formula $<r,x_{j}>$
 \end_inset
 
- and
+ and 
 \begin_inset Formula $i$
 \end_inset
 
  refer to the endogenous variable, the unknown regression coefficients,
  the learning rate, the correlation between the current residuals and the
-
 \begin_inset Formula $j$
 \end_inset
 
--th regressor and the
+-th regressor and the 
 \begin_inset Formula $i$
 \end_inset
 
 -th iteration.
- The learning rate
+ The learning rate 
 \begin_inset Formula $\epsilon$
 \end_inset
 
- is a hyper-parameter and set to a fixed constant (e.g.,
+ is a hyper-parameter and set to a fixed constant (e.g., 
 \begin_inset Formula $\epsilon=0.01$
 \end_inset
 
 ).
- The only computations intense task is to compute the correlation between
-
+ The only computational intense task is to compute the correlation between
+ 
 \begin_inset Formula $r$
 \end_inset
 
- and the all
+ for all 
 \begin_inset Formula $k$
 \end_inset
 
  predictors.
  We make use of Gretl's
 \family typewriter
-mcorr()
+ mcorr()
 \family default
- function for this which is written in C and hence computation is very fast.
+ function for this which is written in C and computationally very fast.
 \end_layout
 
 \begin_layout Standard
 The idea behind the stagewise updates is simple: at each iteration greedily
- select the predictor
+ select the predictor 
 \begin_inset Formula $j$
 \end_inset
 
  that has the largest absolute inner product (or correlation, for standardized
- variables) with the residual.
+ variables under quadratic loss) with the residual.
  As the residuals refer to the yet unexplained part of the model, we are
  searching for any variable that still has some information content for
  explaining 'something' left unexplained.
@@ -356,12 +401,12 @@ The idea behind the stagewise updates is simple: at each iteration greedily
 
 \begin_layout Standard
 Given the greediness that only a single predictor is selected each iteration,
- updating the coefficient of variable
+ updating the coefficient of variable 
 \begin_inset Formula $j$
 \end_inset
 
  by a large amount is problematic.
- Instead, the parameter
+ Instead, the parameter 
 \begin_inset Formula $\text{\ensuremath{\epsilon}}$
 \end_inset
 
@@ -427,23 +472,28 @@ Coefficient paths
 \end_layout
 
 \begin_layout Standard
-Early stopping rules are important for two reasons: First, one tries to
- avoid over-fitting, and second it may be unnecessary to run
+Early stopping rules are important for two reasons: First, one wants to
+ avoid over-fitting meaning that the model learns the training set well
+ but terrifically fails on the test set.
+ Second, it may be unnecessary to run 
 \begin_inset Formula $\bar{N}$
 \end_inset
 
  iterations if no improvement (in terms of model fit) can be seen after
-
+ 
 \begin_inset Formula $N\ll\bar{N}$
 \end_inset
 
  iterations.
- The implemented early stopping strategy checks the absolute correlation
+\end_layout
 
+\begin_layout Standard
+The implemented early stopping strategy checks the absolute correlation
+ 
 \begin_inset Formula $|<r,x_{j}^{i}>|$
 \end_inset
 
-: In case the absolute correlation does not improve for
+: In case the absolute correlation does not improve for 
 \begin_inset Formula $n$
 \end_inset
 
@@ -465,6 +515,8 @@ noprefix "false"
 
  illustrates the development of the development of absolute correlation
  between the residuals and the selected variables.
+ As one can see, after about 250 iterations the improvement in the correlation
+ coefficient becomes marginal.
 \end_layout
 
 \begin_layout Standard
@@ -513,7 +565,7 @@ Install and load the package
 \begin_layout Standard
 The
 \family typewriter
-fsboost
+ fsboost
 \family default
  package is publicly available on the gretl server.
  The package must be downloaded once, and loaded into memory each time gretl
@@ -561,7 +613,7 @@ set verbose off
 
 \begin_layout Plain Layout
 
-pkg install fsboost        # Download package (only once need)
+pkg install fsboost        # Download package (only once needed)
 \end_layout
 
 \begin_layout Plain Layout
@@ -589,7 +641,7 @@ Example
 \end_layout
 
 \begin_layout Standard
-For illustration we use the
+For illustration we use the 
 \begin_inset Quotes eld
 \end_inset
 
@@ -601,15 +653,19 @@ mroz
  dynamics.
  The endogenous variable is named
 \family typewriter
-wage
+ wage
 \family default
  and refers to the a wife's 1975 average hourly earnings (in 1975 dollars).
  The data set includes additional 24 potential predictors.
 \end_layout
 
+\begin_layout Subsection
+OLS benchmark
+\end_layout
+
 \begin_layout Standard
 The sample script opens the data set, sets the right-hand-side list of predictor
-s and computes standard least square estimates.
+s and computes standard least square estimates first.
 \end_layout
 
 \begin_layout Standard
@@ -914,12 +970,21 @@ Excluding the constant, p-value was highest for variable 3 (hsiblings)
 
 \end_layout
 
+\begin_layout Subsection
+Forward-stagewise regression
+\end_layout
+
 \begin_layout Standard
 Next, we run the forward stagewise regression by calling the
 \family typewriter
-fsboost()
+ fsreg()
 \family default
- function:
+ function.
+ By default the user has two pass only to mandatory arguments: the endogenous
+ series and a list of exogenous.
+ Additional one can pass a bundle comprising optional parameters such as
+ the learning rate.
+ In the following example, we set the learning rate to a rather low value:
 \end_layout
 
 \begin_layout Standard
@@ -949,7 +1014,12 @@ status open
 
 \begin_layout Plain Layout
 
-bundle B = fsboost(LHS, RHS)
+bundle opts = defbundle("learning_rate", 0.0002)  # optional parameter
+\end_layout
+
+\begin_layout Plain Layout
+
+bundle B = fsboost(LHS, RHS, opts)
 \end_layout
 
 \begin_layout Plain Layout
@@ -975,8 +1045,19 @@ print_fsboost_results(B)      # Print estimation results
 \end_layout
 
 \begin_layout Standard
-The regression results are as follows (note that inference is not supported,
- yet!):
+The regression results are as follows:
+\begin_inset Foot
+status open
+
+\begin_layout Plain Layout
+Note that inference such as a t-test or F-tests is not supported.
+ There is ongoing research in the statistics community on how to conduct
+ inference based on sparse estimates.
+\end_layout
+
+\end_inset
+
+
 \end_layout
 
 \begin_layout Standard
@@ -1034,83 +1115,48 @@ Forward-stagewise regression results (no inference)
 
 \begin_layout Plain Layout
 
-                coefficient    std.
+             coefficient    std.
  error   z    p-value
 \end_layout
 
 \begin_layout Plain Layout
 
-  ------------------------------------------------------
+  ---------------------------------------------------
 \end_layout
 
 \begin_layout Plain Layout
 
-  const          2.88386           NA       NA     NA
+  const      -1.24238           NA       NA     NA   
 \end_layout
 
 \begin_layout Plain Layout
 
-  taxableinc    -1.36310e-05       NA       NA     NA
+  lfp         2.60587           NA       NA     NA   
 \end_layout
 
 \begin_layout Plain Layout
 
-  hmothereduc   -0.0483092         NA       NA     NA
+  hours      -0.000284255       NA       NA     NA   
 \end_layout
 
 \begin_layout Plain Layout
 
-  siblings      -0.0700839         NA       NA     NA
+  educ        0.132787          NA       NA     NA   
 \end_layout
 
 \begin_layout Plain Layout
 
-  lfp            3.27042           NA       NA     NA
+  wage76      0.494871          NA       NA     NA   
 \end_layout
 
 \begin_layout Plain Layout
 
-  hours         -0.000930155       NA       NA     NA
+  faminc      1.02652e-05       NA       NA     NA   
 \end_layout
 
 \begin_layout Plain Layout
 
-  educ           0.213255          NA       NA     NA
-\end_layout
-
-\begin_layout Plain Layout
-
-  wage76         0.535865          NA       NA     NA
-\end_layout
-
-\begin_layout Plain Layout
-
-  hhours        -0.000272163       NA       NA     NA
-\end_layout
-
-\begin_layout Plain Layout
-
-  heduc         -0.0536584         NA       NA     NA
-\end_layout
-
-\begin_layout Plain Layout
-
-  hwage         -0.0766289         NA       NA     NA
-\end_layout
-
-\begin_layout Plain Layout
-
-  faminc         2.65937e-05       NA       NA     NA
-\end_layout
-
-\begin_layout Plain Layout
-
-  mtr           -3.88264           NA       NA     NA
-\end_layout
-
-\begin_layout Plain Layout
-
-  mothereduc    -0.0481345         NA       NA     NA
+  mtr        -0.644518          NA       NA     NA   
 \end_layout
 
 \begin_layout Plain Layout
@@ -1119,25 +1165,30 @@ Forward-stagewise regression results (no inference)
 
 \begin_layout Plain Layout
 
-  Number of iterations = 2068
+  Learning rate = 0.0002
+\end_layout
+
+\begin_layout Plain Layout
+
+  Number of iterations = 4964
 \end_layout
 
 \begin_layout Plain Layout
 
   Correl.
  w.
- residuals = -0.0329421
+ residuals = -0.0578633
 \end_layout
 
 \begin_layout Plain Layout
 
   S.E.
- of regression = 2.12071
+ of regression = 2.18792
 \end_layout
 
 \begin_layout Plain Layout
 
-  R-squared = 0.572159
+  R-squared = 0.547703
 \end_layout
 
 \end_inset
@@ -1154,17 +1205,302 @@ Forward-stagewise regression results (no inference)
 \begin_inset VSpace defskip
 \end_inset
 
-The estimator converged after 2068 iterations and selected only 14 out of
+The estimator converged after 4964 iterations and selected only 6 out of
  25 potential predictors.
  The last correlation coefficient between the final residuals and some predictor
- was found being close to zero (-0.033).
- Even though only 14 predictors are selected being relevant, the
+ was found being close to zero (-0.057).
+ Even though only 6 predictors are selected being relevant, the
 \begin_inset Formula $R^{2}$
 \end_inset
 
- statistics is of similar size of the OLS equivalent.
- Also the standard error of the residuals is slightly smaller with 2.12 compared
+ statistics is of similar size compared to the OLS-based equivalent.
+ The standard error of the residuals is slightly smaller (2.18) compared
  to the OLS-based value of 2.14.
+\end_layout
+
+\begin_layout Standard
+The average execution time of the 
+\family typewriter
+fsreg()
+\family default
+ function is 0.8 seconds when repeating the exercise 20 times on a 6 year
+ old i7 Intel notebook CPU.
+\end_layout
+
+\begin_layout Subsection
+Plot the coefficient path
+\end_layout
+
+\begin_layout Standard
+The public function 
+\family typewriter
+plot_coefficient_paths()
+\family default
+ takes as a single mandatory argument the the returned bundle by the 
+\family typewriter
+fsreg()
+\family default
+ function.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Box Doublebox
+position "t"
+hor_pos "c"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "100col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+\begin_inset listings
+lstparams "basicstyle={\footnotesize\ttfamily}"
+inline false
+status open
+
+\begin_layout Plain Layout
+
+plot_coefficient_paths(B)
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset VSpace defskip
+\end_inset
+
+The function returns the coefficient paths of the active set (non-zero coefficie
+nts) only which is depicted in Figure 
+\begin_inset CommandInset ref
+LatexCommand ref
+reference "fig:Coefficient-paths-mroz"
+plural "false"
+caps "false"
+noprefix "false"
+
+\end_inset
+
+.
+ The plot nicely depicts how the point estimates of the 
+\emph on
+active set
+\emph default
+ of variables gradually converge to their final values before the early
+ stopping criteria applies.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+placement h
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Graphics
+	filename coeff_path_mroz.png
+	lyxscale 50
+	scale 50
+
+\end_inset
+
+
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+\begin_inset CommandInset label
+LatexCommand label
+name "fig:Coefficient-paths-mroz"
+
+\end_inset
+
+Coefficient paths of the 
+\emph on
+mroz
+\emph default
+ model.
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsection
+Compute predictions
+\end_layout
+
+\begin_layout Standard
+The function 
+\family typewriter
+fsboost_predict()
+\family default
+ computes the predictions as 
+\begin_inset Formula $\hat{y}=Xb$
+\end_inset
+
+ where 
+\begin_inset Formula $X$
+\end_inset
+
+ is a matrix of dimension 
+\begin_inset Formula $N\times k$
+\end_inset
+
+ and 
+\begin_inset Formula $b$
+\end_inset
+
+ is the coefficient vector of dimension 
+\series bold
+
+\begin_inset Formula $k\times1$
+\end_inset
+
+
+\series default
+.
+
+\series bold
+ 
+\series default
+Note that coefficient vector 
+\begin_inset Formula $b$
+\end_inset
+
+ also
+\emph on
+ includes
+\emph default
+ the zero-coefficients.
+ The following example shows on how to apply the function for predicting
+ some arbitrary five observations:
+\begin_inset Foot
+status open
+
+\begin_layout Plain Layout
+In practice you should 'train' the model parameters on a separate data set
+ and predict on another test set.
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset Box Doublebox
+position "t"
+hor_pos "c"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "100col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+\begin_inset listings
+lstparams "basicstyle={\footnotesize\ttfamily}"
+inline false
+status open
+
+\begin_layout Plain Layout
+
+smpl 1 5              # Restrict the data set to the test set
+\end_layout
+
+\begin_layout Plain Layout
+
+matrix preds = fsboost_predict(RHS, B)
+\end_layout
+
+\begin_layout Plain Layout
+
+print preds
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\begin_layout Plain Layout
+
+preds (5 x 1) [t1 = 1, t2 = 5]
+\end_layout
+
+\begin_layout Plain Layout
+
+      3.5131 
+\end_layout
+
+\begin_layout Plain Layout
+
+      3.5950 
+\end_layout
+
+\begin_layout Plain Layout
+
+      4.1637 
+\end_layout
+
+\begin_layout Plain Layout
+
+      4.0069 
+\end_layout
+
+\begin_layout Plain Layout
+
+      4.4380 
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset VSpace defskip
+\end_inset
+
+
 \end_layout
 
 \begin_layout Section
@@ -1174,7 +1510,7 @@ Using the GUI
 \begin_layout Standard
 Instead of scripting, one may access the
 \family typewriter
-fsboost
+ fsboost
 \family default
  procedure by means of the Gretl GUI.
  Once the package is installed and loaded, simply open the menu
@@ -1251,15 +1587,16 @@ The following public functions currently exist.
 \end_layout
 
 \begin_layout Subsection
-fsboost()
+fsreg()
 \end_layout
 
 \begin_layout Standard
 The
 \family typewriter
-fsboost()
+ fsreg()
 \family default
- function marks the main function.
+ function marks the main function for running the forward-stagewise linear
+ regressions exercise.
  The function arguments are:
 \end_layout
 
@@ -1285,7 +1622,7 @@ status open
 \begin_layout Plain Layout
 
 \family typewriter
-fsboost(const series y, const list X, bundle opts[null])
+fsreg(const series y, const list X, bundle opts[null])
 \end_layout
 
 \end_inset
@@ -1296,7 +1633,7 @@ fsboost(const series y, const list X, bundle opts[null])
 \begin_layout Standard
 Return type:
 \family typewriter
-bundle
+ bundle
 \end_layout
 
 \begin_layout Standard
@@ -1402,7 +1739,7 @@ bundle, Pass parameters for controlling the algorithm (optional)
 \begin_layout Standard
 Return type:
 \family typewriter
-bundle
+ bundle
 \end_layout
 
 \begin_layout Standard
@@ -1436,7 +1773,7 @@ status open
 \begin_layout Plain Layout
 \align center
 \begin_inset Tabular
-<lyxtabular version="3" rows="24" columns="2">
+<lyxtabular version="3" rows="25" columns="2">
 <features tabularvalignment="middle">
 <column alignment="left" valignment="top">
 <column alignment="left" valignment="top">
@@ -1447,7 +1784,7 @@ status open
 \begin_layout Plain Layout
 
 \series bold
-Parameter
+Key
 \end_layout
 
 \end_inset
@@ -1537,7 +1874,7 @@ Actual number of iterations ran
 \begin_layout Plain Layout
 
 \family typewriter
-eta
+learning_rate
 \end_layout
 
 \end_inset
@@ -1948,7 +2285,7 @@ Variance of the estimated final residuals
 </cell>
 </row>
 <row>
-<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+<cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
 \begin_inset Text
 
 \begin_layout Plain Layout
@@ -1959,17 +2296,40 @@ r2_qcorr
 
 \end_inset
 </cell>
-<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
 \begin_inset Text
 
 \begin_layout Plain Layout
 R-square based on quadratic correlation between actual
 \family typewriter
-y
+ y
 \family default
  and fitted
 \family typewriter
-y
+ y
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+uhat_first_order_corr
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+1st order serial correlation coefficient of final residuals (for time-series
+ data set)
 \end_layout
 
 \end_inset
@@ -1994,7 +2354,7 @@ name "tab:Bundle-content-as"
 
 Bundle content as returned by
 \family typewriter
-fsboost()
+ fsreg()
 \family default
 .
 \end_layout
@@ -2019,11 +2379,11 @@ fsboost()
 \begin_layout Standard
 The additional parameters which can be passed by means of the
 \family typewriter
-opts
+ opts
 \family default
  bundle to
 \family typewriter
-fsboost()
+ fsreg()
 \family default
  are shown in Table
 \begin_inset CommandInset ref
@@ -2040,7 +2400,7 @@ noprefix "false"
 
 \begin_layout Standard
 \begin_inset Float table
-placement h
+placement H
 wide false
 sideways false
 status open
@@ -2107,7 +2467,7 @@ Default value
 \begin_layout Plain Layout
 
 \family typewriter
-eta
+learning_rate
 \end_layout
 
 \end_inset
@@ -2125,7 +2485,7 @@ scalar
 \begin_inset Text
 
 \begin_layout Plain Layout
-Learning rate;
+Learning rate; 
 \begin_inset Formula $0<\epsilon<1$
 \end_inset
 
@@ -2138,7 +2498,7 @@ Learning rate;
 \begin_inset Text
 
 \begin_layout Plain Layout
-0.05
+0.025
 \end_layout
 
 \end_inset
@@ -2321,7 +2681,7 @@ name "tab:Parameters-which-can"
 
 Parameters which can be set through the optional bundle
 \family typewriter
-opts
+ opts
 \family default
 .
 \end_layout
@@ -2343,11 +2703,11 @@ print_fsboost_results()
 \begin_layout Standard
 The
 \family typewriter
-print_fsboost_results()
+ print_fsboost_results()
 \family default
  function takes the resulting bundle returned by the
 \family typewriter
-fsboost()
+ fsreg()
 \family default
  function, and prints a summary of the estimation results.
  The argument is:
@@ -2386,7 +2746,7 @@ print_fsboost_results(const bundle B)
 \begin_layout Standard
 Return type:
 \family typewriter
-void
+ void
 \end_layout
 
 \begin_layout Subsection
@@ -2397,12 +2757,12 @@ plot_rho_values()
 For plotting the development of the remaining correlation with the residuals,
  simply call the
 \family typewriter
-plot_rho_values()
+ plot_rho_values()
 \family default
  function.
  It takes the resulting bundle returned by the
 \family typewriter
-fsboost()
+ fsreg()
 \family default
  function.
  The argument is:
@@ -2441,7 +2801,69 @@ plot_rho_values(const bundle B)
 \begin_layout Standard
 Return type:
 \family typewriter
-void
+ void
+\end_layout
+
+\begin_layout Standard
+\begin_inset VSpace defskip
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset Tabular
+<lyxtabular version="3" rows="2" columns="2">
+<features tabularvalignment="middle">
+<column alignment="center" valignment="top">
+<column alignment="left" valignment="top">
+<row>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Argument
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Description
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+B
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+bundle, Bundle returned by 
+\family typewriter
+fsreg()
+\end_layout
+
+\end_inset
+</cell>
+</row>
+</lyxtabular>
+
+\end_inset
+
+
 \end_layout
 
 \begin_layout Subsection
@@ -2452,12 +2874,12 @@ plot_coefficient_paths()
 For plotting the development of the coefficients (coefficient paths), call
  the
 \family typewriter
-plot_coefficient_paths()
+ plot_coefficient_paths()
 \family default
  function.
  It takes the resulting bundle returned by the
 \family typewriter
-fsboost()
+ fsreg()
 \family default
  function.
  The argument is:
@@ -2496,7 +2918,238 @@ plot_coefficient_paths(const bundle B)
 \begin_layout Standard
 Return type:
 \family typewriter
-void
+ void
+\end_layout
+
+\begin_layout Standard
+\begin_inset VSpace defskip
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset Tabular
+<lyxtabular version="3" rows="2" columns="2">
+<features tabularvalignment="middle">
+<column alignment="center" valignment="top">
+<column alignment="left" valignment="top">
+<row>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Argument
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Description
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+B
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+bundle, Bundle returned by 
+\family typewriter
+fsreg()
+\end_layout
+
+\end_inset
+</cell>
+</row>
+</lyxtabular>
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Subsection
+fsboost_predict()
+\end_layout
+
+\begin_layout Standard
+This function computes the linear prediction using the point estimates and
+ a list of regressors must comprise the same set of regressors as passed
+ to the 
+\family typewriter
+fsreg()
+\family default
+ function.
+ The function takes two arguments: A list of regressors and the resulting
+ bundle returned by the
+\family typewriter
+ fsreg()
+\family default
+ function.
+ The argument is:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Box Boxed
+position "t"
+hor_pos "c"
+has_inner_box 1
+inner_pos "t"
+use_parbox 0
+use_makebox 0
+width "100col%"
+special "none"
+height "1in"
+height_special "totalheight"
+thickness "0.4pt"
+separation "3pt"
+shadowsize "4pt"
+framecolor "black"
+backgroundcolor "none"
+status open
+
+\begin_layout Plain Layout
+
+\family typewriter
+fsboost_predict(const list X, const bundle B)
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Return type: 
+\begin_inset Formula $N\times1$
+\end_inset
+
+ matrix on success, otherwise scalar with NA value.
+\end_layout
+
+\begin_layout Standard
+\begin_inset VSpace defskip
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+\begin_inset Tabular
+<lyxtabular version="3" rows="3" columns="2">
+<features tabularvalignment="middle">
+<column alignment="center" valignment="top">
+<column alignment="left" valignment="top">
+<row>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Argument
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Description
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+X
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+list, Non-empty list of predictor variables with 
+\begin_inset Formula $N$
+\end_inset
+
+ observations.
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" bottomline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+B
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="left" valignment="top" topline="true" bottomline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+bundle, Bundle returned by 
+\family typewriter
+fsreg()
+\end_layout
+
+\end_inset
+</cell>
+</row>
+</lyxtabular>
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Section
+References
+\end_layout
+
+\begin_layout Itemize
+Hastie, T., Taylor, J., Tibshirani R.
+ and Walther G.
+ (2007): Forward stagewise regression and the monotone lasso, 
+\emph on
+Electronic Journal of Statistics,
+\emph default
+ Vol.
+ 1, 1-29.
+\end_layout
+
+\begin_layout Itemize
+Tibshirani, R.
+ (2015): A General Framework for Fast Stagewise Algorithms, 
+\emph on
+Journal of Machine Learning Research
+\emph default
+, 16, 2543-2588.
 \end_layout
 
 \end_body

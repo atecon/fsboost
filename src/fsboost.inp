@@ -1,9 +1,9 @@
 function bundle default_fsreg_opts (void)
+    /* Set default values */
 
-    # Set default values
     bundle self = null
     scalar self.verbose = 1
-    scalar self.learning_rate = 0.05
+    scalar self.learning_rate = 0.025
     scalar self.max_num_iterations = 10000
     scalar self.early_stopping_rounds = 50
 
@@ -40,9 +40,9 @@ end function
 
 function bundle fsreg_gui (const series y "Dep. variable",
                            const list X "Candidates",
-                           const scalar learning_rate[0.0001:0.9999:0.05] "Learning rate",
-                           const int max_num_iterations[20::2000] "Max. number of iterations",
-                           const int early_stopping_rounds[10::30] "Early stopping rounds",
+                           const scalar learning_rate[0.0001:0.9999:0.025] "Learning rate",
+                           const int max_num_iterations[100::10000] "Max. number of iterations",
+                           const int early_stopping_rounds[20::50] "Early stopping rounds",
                            const bool plot_coefficient_paths[0] "Plot coefficient paths",
                            const bool plot_rho_values[0] "Plot correlation w. residuals",
                            const int verbose[0:2:1] "Print details" {"quiet", "details", "more details"})
@@ -55,7 +55,7 @@ function bundle fsreg_gui (const series y "Dep. variable",
     scalar model.early_stopping_rounds = early_stopping_rounds
 
     bundle model = fsreg(y, X, model)
-    print_fsreg_results(model)
+    print_fsboost_results(model)
 
     if plot_rho_values == TRUE
         plot_rho_values(model)
@@ -108,15 +108,23 @@ function bundle fsreg (const series y "Dep. variable",
     scalar self.ncoeff = rows(vec(self.coeff_nonzero))
 
     add_yhat_and_uhat_to_bundle(y, X, &self)
-    add_sd_of_uhat(&self)
-    add_first_order_residual_corr(&self)
-    compute_r_squares(&self)
+
+    post_estimation_statistics(&self)
 
     list self.X_final = add_selected_predictors_to_list(X, self)
 
     cleanup_bundle(&self)
 
     return self
+end function
+
+
+function void post_estimation_statistics (bundle *self)
+  /* Add post-estimation statistics to return bundle. */
+
+  add_sd_of_uhat(&self)
+  add_first_order_residual_corr(&self)
+  compute_r_squares(&self)
 end function
 
 
@@ -129,10 +137,11 @@ end function
 function void add_first_order_residual_corr (bundle *self)
   /* First order serial correlation coefficient. */
 
-  matrix muhat = {self.uhat}
-  muhat ~= mlag(muhat, 1)
-
-  scalar self.uhat_first_order_corr = mcorr(muhat)[1,2]
+  if $datatype == 2
+    matrix muhat = {self.uhat}
+    muhat ~= mlag(muhat, 1)
+    scalar self.uhat_first_order_corr = mcorr(muhat)[1,2]
+  endif
 end function
 
 
@@ -166,10 +175,12 @@ function void compute_r_squares (bundle *self)
     Function r2_stats() is taken from the "ridge" package.
     TODO: Currently, we only know that stuff is statistically applicable for statistics "r2_qcorr". */
 
+    scalar self.r2_qcorr = NA
+
     matrix r_squares = r2_stats(self.my, {self.yhat}, self.ncoeff)
-    self.r2_qcorr = r_squares[1]
-    #self.r2_qcorr_adj = r_squares[2]          # depends on self.ncoeff
-    #self.r2_scores = r_squares[3]
+    scalar self.r2_qcorr = r_squares[1]
+    #scalar self.r2_qcorr_adj = r_squares[2]          # depends on self.ncoeff
+    #scalar self.r2_scores = r_squares[3]
 end function
 
 
@@ -229,7 +240,6 @@ function matrix get_rescaled_coeffs (const bundle self)
 end function
 
 
-
 function matrix get_nonzero_rescaled_coeffs (const bundle self)
     /* Retrieve final non-zero point estimates. */
 
@@ -271,6 +281,7 @@ function scalar get_max_correlation (const matrix yX, scalar *position "j-th reg
 
     return correlations[position]
 end function
+
 
 function void print_early_stopping_reached (const bundle self)
     /* */
@@ -334,12 +345,20 @@ function void plot_coefficient_paths (bundle self,
     scalar fontsize = 12
     string filename = (exists(filename)) ? filename : "display"
     string ylog_scale_str = (ylog_scale == TRUE) ? "--ylogscale=10" : ""
-    matrix mplot = self.betas
-    cnameset(mplot, self.Xnames)
+
+    # Only consider active set variables
+    matrix mask = sumc(self.betas)
+    mplot = selifc(self.betas, mask)
+    cnameset(mplot, varnames(self.X_final))
+
+    string linestyles = ""
+    loop i=1..cols(mplot)
+      linestyles += sprintf("set style line %d ps 0.02\n", $i)
+    endloop
 
     plot mplot
         options with-lp time-series single-yaxis @ylog_scale_str
-        #literal set linetype 3 lc rgb "#0000ff"
+        printf "@linestyles"
         literal set key right outside
         literal set grid
         printf "set title \"%s\" font \", %d\"", title, fontsize
@@ -393,94 +412,58 @@ function strings get_names_of_nonzero_coeffs (const bundle self)
 end function
 
 
-function void print_fsreg_results (bundle self)
+function void print_fsboost_results (bundle self)
     /* Print results. */
 
     if self.verbose
         printf "\nForward-stagewise regression results (no inference)"
         printf "\n-------------------------------------------------------\n"
-        strings label_str = defarray("const") + get_names_of_nonzero_coeffs(self) + defarray("Number of iterations", "Correl. w. residuals", "S.E. of regression", "R-squared", "rho")
-        matrix extra = self.actual_num_iterations |self.rho_values[self.actual_num_iterations] | sd(self.uhat) | self.r2_qcorr
 
-        if $datatype == 2
-          matrix extra |= self.uhat_first_order_corr
+        strings label_str = array(0)
+
+        if self.with_constant
+          label_str += defarray("const")
+        endif
+        label_str += get_names_of_nonzero_coeffs(self)
+        label_str += defarray("Learning rate", "Number of iterations", "Correl. w. residuals", "S.E. of regression")
+
+        matrix extra = self.learning_rate | self.actual_num_iterations |self.rho_values[self.actual_num_iterations] | sd(self.uhat)
+
+        if ok(self.r2_qcorr)
+          matrix extra |= self.r2_qcorr
+          label_str += defarray("R-squared")
         endif
 
-        scalar k = self.ncoeff
-        matrix bhat = self.coeff_nonzero ~ mshape(NA, k, 1)
+        if inbundle(self, "uhat_first_order_corr")
+          matrix extra |= self.uhat_first_order_corr
+          label_str += defarray("rho")
+        endif
+
+        matrix bhat = self.coeff_nonzero ~ NA
 
         modprint bhat label_str extra
     endif
 end function
 
 
-/*
-   ############ TODO: DROP LATER
-   function matrix get_y_pred (const matrix mX,
-   const matrix bhat)
-   # Helper function for computing fitted values
-   return mX * bhat
-   end function
+function matrix fsboost_predict (const list L "List of regressors",
+                                 const bundle self)
+  /* Compute predictions using point estimates. List "L" must comprise the same regressors in the same order as originally passed to fsreg(). */
 
-   function matrix get_residuals (const matrix my,
-   const matrix mX,
-   const matrix bhat)
-   #/* Helper function for computing residuals
-   return my - get_y_pred(mX, bhat)
-   end function
+  matrix pred = {NA}
+  list X = null
+  matrix bhat = vec(self.coeff)
 
-   function matrix r2_stats (matrix y_true "T by 1 vector of realizations",
-   matrix y_pred "T by 1 vector of estimated values",
-   scalar num_parameters "No. of parameters")
-   # Helper function for computing different R-square statistics.
+  if self.with_constant == TRUE && inlist(L, "const") == FALSE
+    X += const
+  endif
+  X += L
 
-   matrix R = NA * zeros(3,1)
-   matrix y_true = vec(y_true)
-   matrix y_pred = vec(y_pred)
+  if nelem(X) != rows(bhat)
+    printf "\nError: Length of list L does not match originally passed list.\n"
+    return pred
+  endif
 
-   if rows(y_true) != rows(y_pred)
-   printf "\nError: Vectors y_true and y_pred are of different length.\n"
-   return NA
-   endif
-   if rows(y_pred) < 2
-   printf "\nError: R^2 score not well-defined with less than two samples.\n"
-   return NA
-   endif
-   if isconst(y_true)
-   printf "\nError: Vector y_true is constant.\n"
-   return NA
-   endif
+  return lincomb(X, bhat)
+end function
 
-   R[1] = r2_qcorr(&y_true, &y_pred)
-   #R[2] = r2_qcorr_adjusted(R[1], rows(y_true), num_parameters)
-   #R[3] = r2_score(&y_true, &y_pred)
-   rnameset(R, "r2_qcorr r2_qcorr_adj r2_score")
-
-   return R
-   end function
-
-   function scalar r2_qcorr (const matrix *y_true,
-   const matrix *y_pred)
-   # R-square based on quadratic correlation.
-   return corr(y_true, y_pred)^2
-   end function
-
-   function scalar r2_qcorr_adjusted (scalar r2 "R-square from r2_qcorr()",
-   int n "Sample length",
-   scalar num_parameters "No. of ridge parameters used")
-   # Adjusted R-square based on quadratic correlation
-
-   scalar nominator = n - 1
-   scalar denominator = n - num_parameters - 1
-
-   return 1 - (1-r2) * nominator/denominator
-   end function
-
-
-   function scalar get_residuals_variance (const matrix resids,
-   const int T)
-   # Helper function for computing the residuals' variance
-   return resids'resids / T
-   end function
-
-*/

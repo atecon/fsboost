@@ -3,7 +3,7 @@
 <gretl-function-package name="fsboost" minver="2020b" lives-in-subdir="true">
 <author email="atecon@posteo.de">Artur Tarassow</author>
 <version>0.1</version>
-<date>2020-08-03</date>
+<date>2020-08-28</date>
 <description>Forward-stagewise boosted regression estimates</description>
 <tags>C13 C52</tags>
 <label>Forward Stagewise</label>
@@ -24,10 +24,10 @@ ridge string_utils </depends>
   </param>
   <param name="opts" type="bundle" optional="true"/>
  </params>
-<code>/* Main function for forward stagewise boosted regression. */
-if $datatype != 1       # cross-sectional or panel
+<code>/* Main function for forward-stagewise boosted regression. */
+if $datatype != 2       # cross-sectional or panel
   smpl --no-missing y X
-elif $datatype == 2
+else                    # time-series case
   smpl --contiguous y X
 endif
 bundle self = default_fsreg_opts()
@@ -49,17 +49,15 @@ if self.with_constant
 endif
 matrix self.coeff_nonzero = get_nonzero_rescaled_coeffs(self)
 attach_coefficient_row_labels(&amp;self)
-# FIXME: I could not found how to determine the degrees of freedom for fsreg estimator
-scalar self.num_parameters = rows(vec(self.coeff_nonzero))
+scalar self.ncoeff = rows(vec(self.coeff_nonzero))
 add_yhat_and_uhat_to_bundle(y, X, &amp;self)
-scalar self.uhat_variance = sd(self.uhat)
-compute_r_squares(&amp;self)
+post_estimation_statistics(&amp;self)
 list self.X_final = add_selected_predictors_to_list(X, self)
 cleanup_bundle(&amp;self)
 return self
 </code>
 </gretl-function>
-<gretl-function name="print_fsreg_results" type="void">
+<gretl-function name="print_fsboost_results" type="void">
  <params count="1">
   <param name="self" type="bundle"/>
  </params>
@@ -67,13 +65,22 @@ return self
 if self.verbose
   printf &quot;\nForward-stagewise regression results (no inference)&quot;
   printf &quot;\n-------------------------------------------------------\n&quot;
-  strings label_str = defarray(&quot;const&quot;) + get_names_of_nonzero_coeffs(self) + defarray(&quot;Number of iterations&quot;, &quot;Correl. w. residuals&quot;, &quot;S.E. of regression&quot;, &quot;R-squared&quot;)
-  matrix extra = self.actual_num_iterations |self.rho_values[self.actual_num_iterations] | sd(self.uhat) | self.r2_qcorr
-  scalar k = rows(self.coeff_nonzero)
-  matrix bhat = self.coeff_nonzero ~ mshape(NA, k, 1)
-  eval bhat
-  eval label_str
-  eval extra
+  strings label_str = array(0)
+  if self.with_constant
+    label_str += defarray(&quot;const&quot;)
+  endif
+  label_str += get_names_of_nonzero_coeffs(self)
+  label_str += defarray(&quot;Learning rate&quot;, &quot;Number of iterations&quot;, &quot;Correl. w. residuals&quot;, &quot;S.E. of regression&quot;)
+  matrix extra = self.learning_rate | self.actual_num_iterations |self.rho_values[self.actual_num_iterations] | sd(self.uhat)
+  if ok(self.r2_qcorr)
+    matrix extra |= self.r2_qcorr
+    label_str += defarray(&quot;R-squared&quot;)
+  endif
+  if inbundle(self, &quot;uhat_first_order_corr&quot;)
+    matrix extra |= self.uhat_first_order_corr
+    label_str += defarray(&quot;rho&quot;)
+  endif
+  matrix bhat = self.coeff_nonzero ~ NA
   modprint bhat label_str extra
 endif
 </code>
@@ -117,11 +124,17 @@ string ylabel = (ylog_scale == FALSE) ? &quot;Standardized coefficients&quot; : 
 scalar fontsize = 12
 string filename = (exists(filename)) ? filename : &quot;display&quot;
 string ylog_scale_str = (ylog_scale == TRUE) ? &quot;--ylogscale=10&quot; : &quot;&quot;
-matrix mplot = self.betas
-cnameset(mplot, self.Xnames)
+# Only consider active set variables
+matrix mask = sumc(self.betas)
+mplot = selifc(self.betas, mask)
+cnameset(mplot, varnames(self.X_final))
+string linestyles = &quot;&quot;
+loop i=1..cols(mplot)
+  linestyles += sprintf(&quot;set style line %d ps 0.02\n&quot;, $i)
+endloop
 plot mplot
   options with-lp time-series single-yaxis @ylog_scale_str
-  #literal set linetype 3 lc rgb &quot;#0000ff&quot;
+  printf &quot;@linestyles&quot;
   literal set key right outside
   literal set grid
   printf &quot;set title \&quot;%s\&quot; font \&quot;, %d\&quot;&quot;, title, fontsize
@@ -139,13 +152,13 @@ end plot --output=&quot;@filename&quot;
   <param name="X" type="list" const="true">
 <description>Candidates</description>
   </param>
-  <param name="eta" type="scalar" min="0.0001" max="0.9999" default="0.05" const="true">
+  <param name="learning_rate" type="scalar" min="0.0001" max="0.9999" default="0.025" const="true">
 <description>Learning rate</description>
   </param>
-  <param name="max_num_iterations" type="int" min="20" default="2000" const="true">
+  <param name="max_num_iterations" type="int" min="100" default="10000" const="true">
 <description>Max. number of iterations</description>
   </param>
-  <param name="early_stopping_rounds" type="int" min="10" default="30" const="true">
+  <param name="early_stopping_rounds" type="int" min="20" default="50" const="true">
 <description>Early stopping rounds</description>
   </param>
   <param name="plot_coefficient_paths" type="bool" default="0" const="true">
@@ -163,11 +176,11 @@ end plot --output=&quot;@filename&quot;
 <code>/* GUI wrapper for fsreg(). */
 bundle model = null
 scalar model.verbose = verbose
-scalar model.eta = eta
+scalar model.learning_rate = learning_rate
 scalar model.max_num_iterations = max_num_iterations
 scalar model.early_stopping_rounds = early_stopping_rounds
 bundle model = fsreg(y, X, model)
-print_fsreg_results(model)
+print_fsboost_results(model)
 if plot_rho_values == TRUE
   plot_rho_values(model)
 endif
@@ -177,11 +190,33 @@ endif
 return model
 </code>
 </gretl-function>
+<gretl-function name="fsboost_predict" type="matrix">
+ <params count="2">
+  <param name="L" type="list" const="true">
+<description>List of regressors</description>
+  </param>
+  <param name="self" type="bundle" const="true"/>
+ </params>
+<code>/* Compute predictions using point estimates. List &quot;L&quot; must comprise the same regressors in the same order as originally passed to fsreg(). */
+matrix pred = {NA}
+list X = null
+matrix bhat = vec(self.coeff)
+if self.with_constant == TRUE &amp;&amp; inlist(L, &quot;const&quot;) == FALSE
+  X += const
+endif
+X += L
+if nelem(X) != rows(bhat)
+  printf &quot;\nError: Length of list L does not match originally passed list.\n&quot;
+  return pred
+endif
+return lincomb(X, bhat)
+</code>
+</gretl-function>
 <gretl-function name="default_fsreg_opts" type="bundle" private="1">
-<code># Set default values
+<code>/* Set default values */
 bundle self = null
 scalar self.verbose = 1
-scalar self.eta = 0.05         # kind of learning rate
+scalar self.learning_rate = 0.025
 scalar self.max_num_iterations = 10000
 scalar self.early_stopping_rounds = 50
 return self
@@ -195,7 +230,7 @@ return self
 matrix self.my = cdemean({self.y}, TRUE)
 scalar self.ysd = sdc({self.y})
 matrix self.mX = cdemean({self.X_wo_constant}, TRUE)
-matrix self.Xsd = sdc({self.X_wo_constant})           # gives row vector
+matrix self.Xsd = sdc({self.X_wo_constant})
 </code>
 </gretl-function>
 <gretl-function name="initialize" type="void" private="1">
@@ -217,12 +252,42 @@ matrix self.betas = zeros(self.max_num_iterations, nelem(self.X_wo_constant))
 scalar self.actual_num_iterations = NA
 </code>
 </gretl-function>
+<gretl-function name="post_estimation_statistics" type="void" private="1">
+ <params count="1">
+  <param name="self" type="bundleref"/>
+ </params>
+<code>/* Add post-estimation statistics to return bundle. */
+add_sd_of_uhat(&amp;self)
+add_first_order_residual_corr(&amp;self)
+compute_r_squares(&amp;self)
+</code>
+</gretl-function>
+<gretl-function name="add_sd_of_uhat" type="void" private="1">
+ <params count="1">
+  <param name="self" type="bundleref"/>
+ </params>
+<code>/* Standard deviation of residuals */
+scalar self.uhat_variance = sd(self.uhat)
+</code>
+</gretl-function>
+<gretl-function name="add_first_order_residual_corr" type="void" private="1">
+ <params count="1">
+  <param name="self" type="bundleref"/>
+ </params>
+<code>/* First order serial correlation coefficient. */
+if $datatype == 2
+  matrix muhat = {self.uhat}
+  muhat ~= mlag(muhat, 1)
+  scalar self.uhat_first_order_corr = mcorr(muhat)[1,2]
+endif
+</code>
+</gretl-function>
 <gretl-function name="add_selected_predictors_to_list" type="list" private="1">
  <params count="2">
   <param name="X" type="list" const="true"/>
   <param name="self" type="bundle" const="true"/>
  </params>
-<code>/* Add selected preditors to list. */
+<code>/* Add active set of predictors to list. */
 list L = (self.with_constant == TRUE) ? const : null
 S = get_names_of_nonzero_coeffs(self)
 loop foreach i S
@@ -246,11 +311,14 @@ series self.uhat = y - self.yhat
  <params count="1">
   <param name="self" type="bundleref"/>
  </params>
-<code>/* Wrapper calling functions for computing R^2. Currently, we only know that stuff is statistically correct for statistics &quot;r2_qcorr&quot;. */
-matrix r_squares = r2_stats(self.my, {self.yhat}, self.num_parameters)
-self.r2_qcorr = r_squares[1]
-#self.r2_qcorr_adj = r_squares[2]          # depends on self.num_parameters
-#self.r2_scores = r_squares[3]
+<code>/* Wrapper calling functions for computing R^2.
+Function r2_stats() is taken from the &quot;ridge&quot; package.
+TODO: Currently, we only know that stuff is statistically applicable for statistics &quot;r2_qcorr&quot;. */
+scalar self.r2_qcorr = NA
+matrix r_squares = r2_stats(self.my, {self.yhat}, self.ncoeff)
+scalar self.r2_qcorr = r_squares[1]
+#scalar self.r2_qcorr_adj = r_squares[2]          # depends on self.ncoeff
+#scalar self.r2_scores = r_squares[3]
 </code>
 </gretl-function>
 <gretl-function name="cleanup_bundle" type="void" private="1">
@@ -263,7 +331,7 @@ delete self.ysd
 delete self.mX
 delete self.y
 delete self.my
-delete self.num_parameters
+#delete self.ncoeff
 delete self.X_wo_constant
 delete self.resid_mean
 </code>
@@ -273,11 +341,9 @@ delete self.resid_mean
   <param name="self" type="bundleref"/>
  </params>
 <code>/* Attach row labels to vector of point estimates. */
-if self.with_constant
-  S = defarray(&quot;const&quot;) + get_names_of_nonzero_coeffs(self)
-else
-  S = get_names_of_nonzero_coeffs(self)
-endif
+strings S = array(0)
+S = (self.with_constant == TRUE) ? defarray(&quot;const&quot;) : S
+strings S += get_names_of_nonzero_coeffs(self)
 rnameset(self.coeff_nonzero, S)
 rnameset(self.coeff, self.Xnames)
 </code>
@@ -335,7 +401,7 @@ return selifr(self.coeff, mask)
   </param>
  </params>
 <code>/* Compute forward stagewise &quot;delta&quot; value. */
-return self.eta * sgn(rho)
+return self.learning_rate * sgn(rho)
 </code>
 </gretl-function>
 <gretl-function name="update_beta" type="scalar" private="1">
@@ -456,6 +522,9 @@ if runEX == 1
     series LHS = ldiff(PAU)
     list RHS = const LHS(-1 to -2) IUS(-1 to -2)  IAU(-1 to -2)
 
+    # Optional: set learning rate
+    bundle opts = defbundle(&quot;learning_rate&quot;, 0.05)
+
 elif runEX == 2
     # SIMULATION
     nulldata 750
@@ -471,26 +540,59 @@ elif runEX == 2
         RHS += genseries(sprintf(&quot;S%d&quot;, $i), X[,i])
     endloop
 
+    bundle opts = null
+
 elif runEX == 3
     open mroz.gdt -q -p     # cross-sectional data set
+
     series LHS = wage
     list RHS = const dataset
+    RHS -= LHS wage     # drop lhs varianbe
 
-    RHS -= LHS wage     # drop lhs varianle
+    # Set a low learning rate
+    bundle opts = defbundle(&quot;learning_rate&quot;, 0.0002)
+
+elif runEX == 4             # example taken from Allin's regls pckg.
+
+    # An artificial example with more regressors than observations,
+    # where the actually relevant regressors are known. With an s
+    # value (lambda/lambda-max) of around 0.3, ADMM is pretty good
+    # at picking out the relevant ones. Note that no seed is set, so
+    # results will differ somewhat from run to run.
+
+    n = 80  # observations
+    k = 120 # regressors
+    matrix X = mnormal(n,k)
+    u = mnormal(n, 1)
+    matrix sel = {5, 20, 37, 60, 70}
+    matrix y = sumr(X[,sel]) + u
+    printf &quot;Truly non-zero coefficients:\n&quot;
+    eval sel
+
+    nulldata n --preserve
+    series LHS = y
+    list RHS = null
+    loop i=1..k -q
+      RHS += genseries(sprintf(&quot;x%d&quot;, i), X[,i])
+    endloop
+
+    # Set a low learning rate
+    bundle opts = defbundle(&quot;learning_rate&quot;, 0.0002)
 endif
 
 # Run standard OLS as benchmark
-ols LHS RHS
-
+if nelem(RHS) &lt; $nobs
+    ols LHS RHS
+endif
 
 
 # Run estimation
-bundle B = fsreg(LHS, RHS)
-
-print_fsreg_results(B)      # Print estimation results
+bundle B = fsreg(LHS, RHS, opts)
+#print B
+print_fsboost_results(B)      # Print estimation results
 
 list X_final = B.X_final    # Retrieve list of selected regressors
-X_final
+eval varnames(X_final)
 
 # Retrieve point estimates
 eval B.coeff            # retrieve point estimates of all variables
@@ -502,17 +604,22 @@ series yhat = B.yhat    # Retrieve fitted values
 #gnuplot LHS yhat --output=&quot;display&quot;
 
 # Plot correlations as a function of iterations
-plot_rho_values(B)
+#plot_rho_values(B)
 
 # Plot coefficient paths
 plot_coefficient_paths(B)
+
+# Prediction
+smpl 1 10
+matrix preds = fsboost_predict(RHS, B)
+print preds
 
 
 /* Activate if wished
 # Define own parameter set
 bundle opts = null
 scalar opts.verbose = 1
-scalar opts.eta = 0.001                  # learning rate
+scalar opts.learning_rate = 0.001                  # learning rate
 scalar opts.max_num_iterations = 5000   # max. number of boosting rounds
 scalar opts.early_stopping_rounds = 20  # stop if no improvement after n rounds
 
