@@ -179,8 +179,16 @@ function void compute_r_squares (bundle *self)
 
     matrix r_squares = r2_stats(self.my, {self.yhat}, self.ncoeff)
     scalar self.r2_qcorr = r_squares[1]
+    scalar self.r2 = get_rsquare(self)
     #scalar self.r2_qcorr_adj = r_squares[2]          # depends on self.ncoeff
     #scalar self.r2_scores = r_squares[3]
+end function
+
+
+function scalar get_rsquare (const bundle self)
+    /* Alternative computation of R-squared statistics. */
+
+    return 1 - sum((self.y - self.yhat)^2) / sst(self.y)
 end function
 
 
@@ -415,34 +423,36 @@ end function
 function void print_fsboost_results (bundle self)
     /* Print results. */
 
-    if self.verbose
-        printf "\nForward-stagewise regression results (no inference)"
-        printf "\n-------------------------------------------------------\n"
+    printf "\nForward-stagewise regression results (no inference)"
+    printf "\n-------------------------------------------------------\n"
 
-        strings label_str = array(0)
+    strings label_str = array(0)
 
-        if self.with_constant
-          label_str += defarray("const")
-        endif
-        label_str += get_names_of_nonzero_coeffs(self)
-        label_str += defarray("Learning rate", "Number of iterations", "Correl. w. residuals", "S.E. of regression")
-
-        matrix extra = self.learning_rate | self.actual_num_iterations |self.rho_values[self.actual_num_iterations] | sd(self.uhat)
-
-        if ok(self.r2_qcorr)
-          matrix extra |= self.r2_qcorr
-          label_str += defarray("R-squared")
-        endif
-
-        if inbundle(self, "uhat_first_order_corr")
-          matrix extra |= self.uhat_first_order_corr
-          label_str += defarray("rho")
-        endif
-
-        matrix bhat = self.coeff_nonzero ~ NA
-
-        modprint bhat label_str extra
+    if self.with_constant
+      label_str += defarray("const")
     endif
+    label_str += get_names_of_nonzero_coeffs(self)
+    label_str += defarray("Learning rate", "Number of iterations", "Correl. w. residuals", "S.E. of regression")
+
+    matrix extra = self.learning_rate | self.actual_num_iterations |self.rho_values[self.actual_num_iterations] | sd(self.uhat)
+
+    if ok(self.r2)
+      matrix extra |= self.r2
+      label_str += defarray("R-squared")
+    endif
+    if ok(self.r2_qcorr)
+      matrix extra |= self.r2_qcorr
+      label_str += defarray("R-squared alt.")
+    endif
+
+    if inbundle(self, "uhat_first_order_corr")
+      matrix extra |= self.uhat_first_order_corr
+      label_str += defarray("rho")
+    endif
+
+    matrix bhat = self.coeff_nonzero ~ NA
+
+    modprint bhat label_str extra
 end function
 
 

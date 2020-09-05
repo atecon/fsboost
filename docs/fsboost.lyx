@@ -148,7 +148,7 @@ Changelog
 \begin_layout Itemize
 
 \size footnotesize
-Version 0.1 (August, 2020)
+Version 0.1 (September, 2020)
 \end_layout
 
 \begin_deeper
@@ -175,12 +175,12 @@ Introduction
 \end_layout
 
 \begin_layout Standard
-Selecting the relevant predictors among a many potential ones is a crucial
- task when working with numerous potentially relevant predictors.
+Selecting the relevant predictors is a crucial task when working with a
+ large pool of potentially relevant ones.
  Neglecting relevant predictors may lead to inconsistent parameter estimates
- while considering irrelevant regressors may yield and inefficient estimator.
- Furthermore, considering highly correlated predictors within a standard
- least square regression setting most probably suffers from multicollinearity
+ while considering irrelevant regressors leads to inefficient estimates.
+ Furthermore, including highly correlated predictors within a standard least
+ square regression setting most probably suffers from multicollinearity
  issues.
  Lastly, standard least squares cannot handle the case when the number of
  observations, 
@@ -196,10 +196,10 @@ Selecting the relevant predictors among a many potential ones is a crucial
 
 \begin_layout Standard
 So called shrinkage and/ or selection estimators such as Ridge or Lasso
- among others, are known to handle such issues by imposing an additional
+ among others are known to handle such issues by imposing an additional
  restriction to an otherwise ordinary least square setting.
- Another estimation approach marks the so called forward stagewise regression
- approach (
+ Another alternative estimation approach is the so called forward stagewise
+ regression approach (
 \emph on
 fsboost
 \emph default
@@ -211,9 +211,9 @@ fsboost
 \emph on
 fsboost
 \emph default
- follows a simple strategy for constructing a sequence of sparse regression
- estimates: Initially set all coefficients to zero, and iteratively update
- the coefficient (by a small amount, depending on the
+ is a simple strategy for constructing a sequence of sparse regression estimates
+: Initially set all coefficients to zero, and iteratively update the coefficient
+ (by a small amount, depending on the
 \emph on
  learning rate 
 \begin_inset Formula $\epsilon$
@@ -221,18 +221,21 @@ fsboost
 
 
 \emph default
-) of the variable that achieves the (under quadratic loss) maximal absolute
+) of the variable that achieves (under quadratic loss) the maximal absolute
  correlation with the current residual.
 
 \emph on
  Learning
 \emph default
- from the residuals has some connection to an approach named 
+ from the residuals has some connection to an approach known as 
 \emph on
 boosting
 \emph default
  in the machine-learning community.
- However, the 
+\end_layout
+
+\begin_layout Standard
+The 
 \emph on
 fsboost
 \emph default
@@ -243,14 +246,11 @@ fsboost
 \begin_inset Formula $\varepsilon\rightarrow0$
 \end_inset
 
- the sequence of forward stagewise estimates exactly coincides with the
+, the sequence of forward stagewise estimates exactly coincides with the
  lasso path.
  While, this equivalence holds outside of least squares regression (Tibshirani,
  2015), currently we only support minimization of squared loss (RMSE).
-\end_layout
-
-\begin_layout Standard
-Furthermore, as shown by Tibshirani, the 
+ Furthermore, as shown by Tibshirani, the 
 \emph on
 fsboost
 \emph default
@@ -287,6 +287,32 @@ Start with
 \end_inset
 
 .
+\begin_inset Foot
+status open
+
+\begin_layout Plain Layout
+Note that some references initialize 
+\begin_inset Formula $r$
+\end_inset
+
+ as 
+\begin_inset Formula $r=y-\bar{y}$
+\end_inset
+
+ where 
+\begin_inset Formula $\bar{y}$
+\end_inset
+
+ refers to the mean of 
+\begin_inset Formula $y$
+\end_inset
+
+.
+\end_layout
+
+\end_inset
+
+
 \end_layout
 
 \begin_layout Enumerate
@@ -332,17 +358,17 @@ Here
 
 ,
 \series bold
-
+ 
 \begin_inset Formula $\beta$
 \end_inset
 
 
 \series default
-,
+, 
 \begin_inset Formula $\epsilon$
 \end_inset
 
-,
+, 
 \begin_inset Formula $<r,x_{j}>$
 \end_inset
 
@@ -488,8 +514,11 @@ Early stopping rules are important for two reasons: First, one wants to
 \end_layout
 
 \begin_layout Standard
-The implemented early stopping strategy checks the absolute correlation
- 
+The implemented 
+\emph on
+early stopping 
+\emph default
+strategy checks the absolute correlation 
 \begin_inset Formula $|<r,x_{j}^{i}>|$
 \end_inset
 
@@ -497,13 +526,13 @@ The implemented early stopping strategy checks the absolute correlation
 \begin_inset Formula $n$
 \end_inset
 
- (e.g.,
+ (e.g., 
 \begin_inset Formula $n=30)$
 \end_inset
 
  iterations, we assume that the coefficient estimates have converged and
  stop the algorithm.
- Figure
+ Figure 
 \begin_inset CommandInset ref
 LatexCommand ref
 reference "fig:Correlation-dynamics"
@@ -513,8 +542,8 @@ noprefix "false"
 
 \end_inset
 
- illustrates the development of the development of absolute correlation
- between the residuals and the selected variables.
+ illustrates the development of the absolute correlation between the residuals
+ and the selected variables.
  As one can see, after about 250 iterations the improvement in the correlation
  coefficient becomes marginal.
 \end_layout
@@ -545,7 +574,12 @@ name "fig:Correlation-dynamics"
 
 \end_inset
 
-Correlation dynamics
+Correlation dynamics between the updated residuals and the most correlated
+ predictor 
+\begin_inset Formula $x_{j}^{i}$
+\end_inset
+
+.
 \end_layout
 
 \end_inset
@@ -645,7 +679,7 @@ For illustration we use the
 \begin_inset Quotes eld
 \end_inset
 
-mroz
+mroz87
 \begin_inset Quotes erd
 \end_inset
 
@@ -653,10 +687,10 @@ mroz
  dynamics.
  The endogenous variable is named
 \family typewriter
- wage
+ WW
 \family default
  and refers to the a wife's 1975 average hourly earnings (in 1975 dollars).
- The data set includes additional 24 potential predictors.
+ The data set includes additional 17 potential predictors.
 \end_layout
 
 \begin_layout Subsection
@@ -695,7 +729,7 @@ status open
 
 \begin_layout Plain Layout
 
-open mroz.gdt --quiet
+open mroz87.gdt --quiet
 \end_layout
 
 \begin_layout Plain Layout
@@ -705,7 +739,7 @@ list RHS = const dataset
 
 \begin_layout Plain Layout
 
-RHS -= wage            # drop lhs variable
+RHS -= WW              # drop lhs variable
 \end_layout
 
 \begin_layout Plain Layout
@@ -760,7 +794,7 @@ status open
 
 \begin_layout Plain Layout
 
-m: OLS, using observations 1-753
+Model 1: OLS, using observations 1-753
 \end_layout
 
 \begin_layout Plain Layout
@@ -774,138 +808,108 @@ Dependent variable: LHS
 
 \begin_layout Plain Layout
 
-                 coefficient    std.
- error    t-ratio    p-value
+             coefficient    std.
+ error    t-ratio    p-value 
 \end_layout
 
 \begin_layout Plain Layout
 
-  ---------------------------------------------------------------
+  -----------------------------------------------------------
 \end_layout
 
 \begin_layout Plain Layout
 
-  const           4.10278       2.37643        1.726     0.0847   *
+  const       3.42796       2.32166        1.477     0.1402  
 \end_layout
 
 \begin_layout Plain Layout
 
-  taxableinc     −1.31268e-05   2.74615e-05   −0.4780    0.6328
+  LFP         3.47221       0.257362      13.49      3.22e-37 ***
 \end_layout
 
 \begin_layout Plain Layout
 
-  federaltax      2.12780e-05   9.20550e-05    0.2311    0.8173
+  WHRS       -0.00110533    0.000151422   -7.300     7.51e-13 ***
 \end_layout
 
 \begin_layout Plain Layout
 
-  hsiblings      −0.000386927   0.0355359     −0.01089   0.9913
+  KL6        -0.0444317     0.178645      -0.2487    0.8037  
 \end_layout
 
 \begin_layout Plain Layout
 
-  hfathereduc     0.0139611     0.0285757      0.4886    0.6253
+  K618       -0.0217407     0.0699922     -0.3106    0.7562  
 \end_layout
 
 \begin_layout Plain Layout
 
-  hmothereduc    −0.0396817     0.0276745     −1.434     0.1520
+  WA         -0.00253127    0.0225216     -0.1124    0.9105  
 \end_layout
 
 \begin_layout Plain Layout
 
-  siblings       −0.0694937     0.0358372     −1.939     0.0529   *
+  WE          0.215215      0.0490769      4.385     1.33e-05 ***
 \end_layout
 
 \begin_layout Plain Layout
 
-  lfp             3.45220       0.263461      13.10      2.25e-35 ***
+  RPWG        0.537172      0.0457955     11.73      3.04e-29 ***
 \end_layout
 
 \begin_layout Plain Layout
 
-  hours          −0.00111994    0.000152678   −7.335     5.91e-13 ***
+  HHRS       -0.000473085   0.000170096   -2.781     0.0056   ***
 \end_layout
 
 \begin_layout Plain Layout
 
-  kidsl6         −0.0423818     0.179218      −0.2365    0.8131
+  HA          0.000968849   0.0216386      0.04477   0.9643  
 \end_layout
 
 \begin_layout Plain Layout
 
-  kids618        −0.0329783     0.0703111     −0.4690    0.6392
+  HE         -0.0525726     0.0359107     -1.464     0.1436  
 \end_layout
 
 \begin_layout Plain Layout
 
-  age            −0.00589606    0.0226630     −0.2602    0.7948
+  HW         -0.115575      0.0377458     -3.062     0.0023   ***
 \end_layout
 
 \begin_layout Plain Layout
 
-  educ            0.216125      0.0492212      4.391     1.30e-05 ***
+  FAMINC      3.22894e-05   1.51867e-05    2.126     0.0338   **
 \end_layout
 
 \begin_layout Plain Layout
 
-  wage76          0.543352      0.0463328     11.73      3.26e-29 ***
+  MTR        -4.90658       2.38066       -2.061     0.0397   **
 \end_layout
 
 \begin_layout Plain Layout
 
-  hhours         −0.000484660   0.000170424   −2.844     0.0046   ***
+  WMED       -0.0289774     0.0298579     -0.9705    0.3321  
 \end_layout
 
 \begin_layout Plain Layout
 
-  hage            0.00327033    0.0217384      0.1504    0.8805
+  WFED       -0.0209198     0.0282231     -0.7412    0.4588  
 \end_layout
 
 \begin_layout Plain Layout
 
-  heduc          −0.0511196     0.0359926     −1.420     0.1560
+  UN         -0.0177959     0.0260952     -0.6820    0.4955  
 \end_layout
 
 \begin_layout Plain Layout
 
-  hwage          −0.123328      0.0380489     −3.241     0.0012   ***
+  CIT         0.0104698     0.178266       0.05873   0.9532  
 \end_layout
 
 \begin_layout Plain Layout
 
-  faminc          3.36999e-05   1.52480e-05    2.210     0.0274   **
-\end_layout
-
-\begin_layout Plain Layout
-
-  mtr            −4.76933       2.38306       −2.001     0.0457   **
-\end_layout
-
-\begin_layout Plain Layout
-
-  mothereduc     −0.0282278     0.0299406     −0.9428    0.3461
-\end_layout
-
-\begin_layout Plain Layout
-
-  fathereduc     −0.0220970     0.0285042     −0.7752    0.4385
-\end_layout
-
-\begin_layout Plain Layout
-
-  unemployment   −0.0156837     0.0262039     −0.5985    0.5497
-\end_layout
-
-\begin_layout Plain Layout
-
-  largecity       0.00659037    0.179593       0.03670   0.9707
-\end_layout
-
-\begin_layout Plain Layout
-
-  exper           0.00247946    0.0121007      0.2049    0.8377
+  AX          0.00342378    0.0120605      0.2839    0.7766  
 \end_layout
 
 \begin_layout Plain Layout
@@ -920,37 +924,28 @@ Mean dependent var   2.374565   S.D.
 
 \begin_layout Plain Layout
 
-Sum squared resid    3351.283   S.E.
- of regression   2.145556
+Sum squared resid    3379.759   S.E.
+ of regression   2.145828
 \end_layout
 
 \begin_layout Plain Layout
 
-R-squared            0.575954   Adjusted R-squared   0.561974
+R-squared            0.572351   Adjusted R-squared   0.561863
 \end_layout
 
 \begin_layout Plain Layout
 
-F(24, 728)           41.19977   P-value(F)           2.5e-118
+F(18, 734)           54.57555   P-value(F)           4.3e-122
 \end_layout
 
 \begin_layout Plain Layout
 
-Log-likelihood      −1630.588   Akaike criterion     3311.176
+Log-likelihood      -1633.773   Akaike criterion     3305.547
 \end_layout
 
 \begin_layout Plain Layout
 
-Schwarz criterion    3426.777   Hannan-Quinn         3355.711
-\end_layout
-
-\begin_layout Plain Layout
-
-\end_layout
-
-\begin_layout Plain Layout
-
-Excluding the constant, p-value was highest for variable 3 (hsiblings)
+Schwarz criterion    3393.404   Hannan-Quinn         3339.394
 \end_layout
 
 \end_inset
@@ -1019,7 +1014,7 @@ bundle opts = defbundle("learning_rate", 0.0002)  # optional parameter
 
 \begin_layout Plain Layout
 
-bundle B = fsboost(LHS, RHS, opts)
+bundle B = fsreg(LHS, RHS, opts)
 \end_layout
 
 \begin_layout Plain Layout
@@ -1087,20 +1082,6 @@ status open
 
 \begin_layout Plain Layout
 
-Info: No improvement in correlation for the last 50 iterations.
-\end_layout
-
-\begin_layout Plain Layout
-
- Early stopping applies.
-\end_layout
-
-\begin_layout Plain Layout
-
-\end_layout
-
-\begin_layout Plain Layout
-
 Forward-stagewise regression results (no inference)
 \end_layout
 
@@ -1131,32 +1112,32 @@ Forward-stagewise regression results (no inference)
 
 \begin_layout Plain Layout
 
-  lfp         2.60587           NA       NA     NA   
+  LFP         2.60587           NA       NA     NA   
 \end_layout
 
 \begin_layout Plain Layout
 
-  hours      -0.000284255       NA       NA     NA   
+  WHRS       -0.000284255       NA       NA     NA   
 \end_layout
 
 \begin_layout Plain Layout
 
-  educ        0.132787          NA       NA     NA   
+  WE          0.132787          NA       NA     NA   
 \end_layout
 
 \begin_layout Plain Layout
 
-  wage76      0.494871          NA       NA     NA   
+  RPWG        0.494871          NA       NA     NA   
 \end_layout
 
 \begin_layout Plain Layout
 
-  faminc      1.02652e-05       NA       NA     NA   
+  FAMINC      1.02652e-05       NA       NA     NA   
 \end_layout
 
 \begin_layout Plain Layout
 
-  mtr        -0.644518          NA       NA     NA   
+  MTR        -0.644518          NA       NA     NA   
 \end_layout
 
 \begin_layout Plain Layout
@@ -1206,20 +1187,18 @@ Forward-stagewise regression results (no inference)
 \end_inset
 
 The estimator converged after 4964 iterations and selected only 6 out of
- 25 potential predictors.
- The last correlation coefficient between the final residuals and some predictor
- was found being close to zero (-0.057).
- Even though only 6 predictors are selected being relevant, the
+ 17 potential predictors.
+ The final correlation coefficient between the residuals and the predictor
+ mostly correlated with these residuals is close to zero (-0.057) after the
+ early stopping rule applies.
+ Even though only 6 predictors are selected being relevant, the 
 \begin_inset Formula $R^{2}$
 \end_inset
 
  statistics is of similar size compared to the OLS-based equivalent.
  The standard error of the residuals is slightly smaller (2.18) compared
  to the OLS-based value of 2.14.
-\end_layout
-
-\begin_layout Standard
-The average execution time of the 
+ The average execution time of the 
 \family typewriter
 fsreg()
 \family default
@@ -1403,8 +1382,8 @@ Note that coefficient vector
 status open
 
 \begin_layout Plain Layout
-In practice you should 'train' the model parameters on a separate data set
- and predict on another test set.
+In practice one 'trains' the model on a separate training data set and predicts
+ on another test set.
 \end_layout
 
 \end_inset
@@ -1595,8 +1574,8 @@ The
 \family typewriter
  fsreg()
 \family default
- function marks the main function for running the forward-stagewise linear
- regressions exercise.
+ function marks the main function for executing the forward-stagewise linear
+ regression.
  The function arguments are:
 \end_layout
 
@@ -1773,7 +1752,7 @@ status open
 \begin_layout Plain Layout
 \align center
 \begin_inset Tabular
-<lyxtabular version="3" rows="25" columns="2">
+<lyxtabular version="3" rows="26" columns="2">
 <features tabularvalignment="middle">
 <column alignment="left" valignment="top">
 <column alignment="left" valignment="top">
@@ -2291,6 +2270,33 @@ Variance of the estimated final residuals
 \begin_layout Plain Layout
 
 \family typewriter
+r2
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+R-squared stats.
+ computed as 
+\begin_inset Formula $1-\sum(y-\hat{y})^{2}/\sum(y-\bar{y})^{2}$
+\end_inset
+
+.
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
 r2_qcorr
 \end_layout
 
@@ -2300,13 +2306,16 @@ r2_qcorr
 \begin_inset Text
 
 \begin_layout Plain Layout
-R-square based on quadratic correlation between actual
-\family typewriter
- y
-\family default
- and fitted
-\family typewriter
- y
+R-squared stats.
+ based on quadratic correlation between 
+\begin_inset Formula $y$
+\end_inset
+
+ and 
+\begin_inset Formula $\hat{y}$
+\end_inset
+
+
 \end_layout
 
 \end_inset
@@ -2647,7 +2656,7 @@ bool
 \begin_inset Text
 
 \begin_layout Plain Layout
-Print details or not: either 0 or 1
+Print details or not: either 0 gor 1
 \end_layout
 
 \end_inset
@@ -2754,8 +2763,16 @@ plot_rho_values()
 \end_layout
 
 \begin_layout Standard
-For plotting the development of the remaining correlation with the residuals,
- simply call the
+For plotting the iterative development of the correlation between the residuals,
+ 
+\begin_inset Formula $r^{i}$
+\end_inset
+
+, and the most correlated predictor, 
+\begin_inset Formula $x_{j}^{i}$
+\end_inset
+
+, call the
 \family typewriter
  plot_rho_values()
 \family default
@@ -2988,9 +3005,9 @@ fsboost_predict()
 \end_layout
 
 \begin_layout Standard
-This function computes the linear prediction using the point estimates and
- a list of regressors must comprise the same set of regressors as passed
- to the 
+This function computes the prediction using the point estimates and a list
+ of regressors.
+ This list gmust comprise the same set of regressors as passed to the 
 \family typewriter
 fsreg()
 \family default

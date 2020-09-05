@@ -3,7 +3,7 @@
 <gretl-function-package name="fsboost" minver="2020b" lives-in-subdir="true">
 <author email="atecon@posteo.de">Artur Tarassow</author>
 <version>0.1</version>
-<date>2020-08-28</date>
+<date>2020-09-05</date>
 <description>Forward-stagewise boosted regression estimates</description>
 <tags>C13 C52</tags>
 <label>Forward Stagewise</label>
@@ -62,27 +62,29 @@ return self
   <param name="self" type="bundle"/>
  </params>
 <code>/* Print results. */
-if self.verbose
-  printf &quot;\nForward-stagewise regression results (no inference)&quot;
-  printf &quot;\n-------------------------------------------------------\n&quot;
-  strings label_str = array(0)
-  if self.with_constant
-    label_str += defarray(&quot;const&quot;)
-  endif
-  label_str += get_names_of_nonzero_coeffs(self)
-  label_str += defarray(&quot;Learning rate&quot;, &quot;Number of iterations&quot;, &quot;Correl. w. residuals&quot;, &quot;S.E. of regression&quot;)
-  matrix extra = self.learning_rate | self.actual_num_iterations |self.rho_values[self.actual_num_iterations] | sd(self.uhat)
-  if ok(self.r2_qcorr)
-    matrix extra |= self.r2_qcorr
-    label_str += defarray(&quot;R-squared&quot;)
-  endif
-  if inbundle(self, &quot;uhat_first_order_corr&quot;)
-    matrix extra |= self.uhat_first_order_corr
-    label_str += defarray(&quot;rho&quot;)
-  endif
-  matrix bhat = self.coeff_nonzero ~ NA
-  modprint bhat label_str extra
+printf &quot;\nForward-stagewise regression results (no inference)&quot;
+printf &quot;\n-------------------------------------------------------\n&quot;
+strings label_str = array(0)
+if self.with_constant
+  label_str += defarray(&quot;const&quot;)
 endif
+label_str += get_names_of_nonzero_coeffs(self)
+label_str += defarray(&quot;Learning rate&quot;, &quot;Number of iterations&quot;, &quot;Correl. w. residuals&quot;, &quot;S.E. of regression&quot;)
+matrix extra = self.learning_rate | self.actual_num_iterations |self.rho_values[self.actual_num_iterations] | sd(self.uhat)
+if ok(self.r2)
+  matrix extra |= self.r2
+  label_str += defarray(&quot;R-squared&quot;)
+endif
+if ok(self.r2_qcorr)
+  matrix extra |= self.r2_qcorr
+  label_str += defarray(&quot;R-squared alt.&quot;)
+endif
+if inbundle(self, &quot;uhat_first_order_corr&quot;)
+  matrix extra |= self.uhat_first_order_corr
+  label_str += defarray(&quot;rho&quot;)
+endif
+matrix bhat = self.coeff_nonzero ~ NA
+modprint bhat label_str extra
 </code>
 </gretl-function>
 <gretl-function name="plot_rho_values" type="void">
@@ -317,8 +319,17 @@ TODO: Currently, we only know that stuff is statistically applicable for statist
 scalar self.r2_qcorr = NA
 matrix r_squares = r2_stats(self.my, {self.yhat}, self.ncoeff)
 scalar self.r2_qcorr = r_squares[1]
+scalar self.r2 = get_rsquare(self)
 #scalar self.r2_qcorr_adj = r_squares[2]          # depends on self.ncoeff
 #scalar self.r2_scores = r_squares[3]
+</code>
+</gretl-function>
+<gretl-function name="get_rsquare" type="scalar" private="1">
+ <params count="1">
+  <param name="self" type="bundle" const="true"/>
+ </params>
+<code>/* Alternative computation of R-squared statistics. */
+return 1 - sum((self.y - self.yhat)^2) / sst(self.y)
 </code>
 </gretl-function>
 <gretl-function name="cleanup_bundle" type="void" private="1">
@@ -512,7 +523,7 @@ clear
 include fsboost.gfn
 
 
-scalar runEX = 3		# select an example
+scalar runEX = 1		# select an example
 
 # Select an example
 if runEX == 1
@@ -543,11 +554,11 @@ elif runEX == 2
     bundle opts = null
 
 elif runEX == 3
-    open mroz.gdt -q -p     # cross-sectional data set
+    open mroz87.gdt -q -p     # cross-sectional data set
 
-    series LHS = wage
+    series LHS = WW
     list RHS = const dataset
-    RHS -= LHS wage     # drop lhs varianbe
+    RHS -= LHS WW     # drop lhs varianbe
 
     # Set a low learning rate
     bundle opts = defbundle(&quot;learning_rate&quot;, 0.0002)
@@ -615,6 +626,7 @@ matrix preds = fsboost_predict(RHS, B)
 print preds
 
 
+
 /* Activate if wished
 # Define own parameter set
 bundle opts = null
@@ -625,7 +637,7 @@ scalar opts.early_stopping_rounds = 20  # stop if no improvement after n rounds
 
 # Run estimation
 bundle B = fsreg(LHS, RHS, opts)
-print_fsreg_results(B)      # Print estimation results
+print_fsboost_results(B)      # Print estimation results
 */
 </sample-script>
 </gretl-function-package>
