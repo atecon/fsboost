@@ -95,6 +95,9 @@ The resulting plot looks similar to the following one:
 
 For more details on information available read the pdf help.
 
+# Unit-Tests
+The gretl script including unit-tests can be found under "./tests/run_tests.inp". The coverage is already quite high (probably > 75%). The script can be executed through the shell script "./run_tests.sh".
+
 
 # Changelog
 
