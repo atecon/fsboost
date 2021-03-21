@@ -116,7 +116,7 @@ literal "false"
 \end_layout
 
 \begin_layout Date
-Version 0.1
+Version 0.2
 \end_layout
 
 \begin_layout Standard
@@ -145,6 +145,20 @@ status open
 Changelog
 \end_layout
 
+\begin_layout Itemize
+
+\size footnotesize
+Version 0.2 (March, 2021)
+\end_layout
+
+\begin_deeper
+\begin_layout Itemize
+
+\size footnotesize
+update docs on early stopping and the learning rate
+\end_layout
+
+\end_deeper
 \begin_layout Itemize
 
 \size footnotesize
@@ -260,6 +274,10 @@ fsboost
 
 \begin_layout Section
 The fsboost algorithm
+\end_layout
+
+\begin_layout Subsection
+The algorithm
 \end_layout
 
 \begin_layout Standard
@@ -495,6 +513,120 @@ Coefficient paths
 \end_inset
 
 
+\end_layout
+
+\begin_layout Subsection
+The learning rate
+\end_layout
+
+\begin_layout Standard
+In practice one of the main problems is how to set the learning rate, 
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\xout off
+\uuline off
+\uwave off
+\noun off
+\color none
+
+\begin_inset Formula $\text{\ensuremath{\epsilon}}$
+\end_inset
+
+.
+ When
+\begin_inset Formula $\text{\ensuremath{\epsilon}}$
+\end_inset
+
+ is too small, the algorithm is less efficient, and when it is too large,
+ estimates can fail to span the full regularization path.
+ On heuristic mentioned by 
+\family default
+\series default
+\shape default
+\size default
+\emph default
+\bar default
+\strikeout default
+\xout default
+\uuline default
+\uwave default
+\noun default
+\color inherit
+Tibshirani (2015) is to start with a large value of 
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\xout off
+\uuline off
+\uwave off
+\noun off
+\color none
+
+\begin_inset Formula $\text{\ensuremath{\epsilon}}$
+\end_inset
+
+, and to plot the progress of the achieved loss.
+ With a reasonable choice of 
+\begin_inset Formula $\text{\ensuremath{\epsilon}}$
+\end_inset
+
+, one should see a monotonic decline in loss with the number of steps realized.
+ If 
+\begin_inset Formula $\text{\ensuremath{\epsilon}}$
+\end_inset
+
+ is too large, one observes in practice that the achieved loss stops its
+ monotone progress and starts to fluctuate up and down.
+\end_layout
+
+\begin_layout Standard
+In principle one could lower the learning rate, and continue the stagewise
+ algorithm from that last step until some stopping criteria is achieved.
+ This continuation, however, is not supported by this package, yet.
+ Also note, that the 'optimal' choice of 
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\xout off
+\uuline off
+\uwave off
+\noun off
+\color none
+
+\begin_inset Formula $\text{\ensuremath{\epsilon}}$
+\end_inset
+
+
+\family default
+\series default
+\shape default
+\size default
+\emph default
+\bar default
+\strikeout default
+\xout default
+\uuline default
+\uwave default
+\noun default
+\color inherit
+ can be determined by cross-validation.
+\end_layout
+
+\begin_layout Subsection
+Early stopping
 \end_layout
 
 \begin_layout Standard

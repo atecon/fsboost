@@ -41,11 +41,11 @@ end function
 function bundle fsreg_gui (const series y "Dep. variable",
                            const list X "Candidates",
                            const scalar learning_rate[0.0001:0.9999:0.025] "Learning rate",
-                           const int max_num_iterations[100::10000] "Max. number of iterations",
-                           const int early_stopping_rounds[20::50] "Early stopping rounds",
+                           int max_num_iterations[100::10000] "Max. number of iterations",
+                           int early_stopping_rounds[20::50] "Early stopping rounds",
                            const bool plot_coefficient_paths[0] "Plot coefficient paths",
                            const bool plot_rho_values[0] "Plot correlation w. residuals",
-                           const int verbose[0:2:1] "Print details" {"quiet", "details", "more details"})
+                           int verbose[0:2:1] "Print details" {"quiet", "details", "more details"})
     /* GUI wrapper for fsreg(). */
 
     bundle model = null
@@ -302,7 +302,7 @@ end function
 
 
 function void print_iteration_details (const bundle self,
-                                       const int iteration,
+                                       int iteration,
                                        const scalar rho "Correlation coeff.")
     /* */
 
