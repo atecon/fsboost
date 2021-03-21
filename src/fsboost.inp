@@ -258,13 +258,6 @@ function matrix get_nonzero_rescaled_coeffs (const bundle self)
 end function
 
 
-function scalar forward_stagewise (const bundle self,
-                                   const scalar rho "Correlation coefficient")
-    /* Compute forward stagewise "delta" value. */
-    return self.learning_rate * sgn(rho)
-end function
-
-
 function scalar update_beta (const scalar beta, const scalar delta)
     /* Update regression coefficient. */
 
@@ -319,15 +312,16 @@ function void fsreg_estimator (bundle *self)
 
     scalar n_rounds_no_improvement = 0
     scalar rho_value_former = NA
+    scalar self.actual_num_iterations = 0
 
     loop i = 1..self.max_num_iterations
         scalar position = NA
-        scalar self.actual_num_iterations = $i
-        scalar col = (i > 1) ? i-1 : 1
+        self.actual_num_iterations++
+        scalar col = (i > 1) ? (i-1) : 1
 
         self.rho_values[i] = get_max_correlation(yX, &position)
         print_iteration_details(self, $i, self.rho_values[i])
-        scalar delta = forward_stagewise(self, self.rho_values[i])
+        delta = self.learning_rate * sgn(self.rho_values[i])
 
         self.betas[i, position] = update_beta(self.betas[i, position], delta)
         yX[,1] = update_residuals(yX[,1], delta, self.mX[, position])
