@@ -1,11 +1,6 @@
 set verbose off
 clear
-#include fsboost.gfn
-include "/home/at/git/ridge/src/ridge.inp" --force
-include "/home/at/git/fsboost/src/fsboost.inp" --force
-
-include string_utils.gfn
-include ridge.gfn
+include fsboost.gfn
 
 scalar runEX = 1		# select an example
 
@@ -17,8 +12,8 @@ if runEX == 1
     series LHS = ldiff(PAU)
     list RHS = const LHS(-1 to -2) IUS(-1 to -2)  IAU(-1 to -2)
 
-    # Optional: set learning rate
-    bundle opts = defbundle("learning_rate", 0.05)
+    # Optional: set learning rate a bit higher
+    bundle opts = _(learning_rate = 0.025)
 
 elif runEX == 2
     # SIMULATION
@@ -45,7 +40,7 @@ elif runEX == 3
     RHS -= LHS WW     # drop lhs varianbe
 
     # Set a low learning rate
-    bundle opts = defbundle("learning_rate", 0.0002)
+    bundle opts = _(learning_rate = 0.025)
 
 elif runEX == 4             # example taken from Allin's regls pckg.
 
@@ -71,8 +66,8 @@ elif runEX == 4             # example taken from Allin's regls pckg.
       RHS += genseries(sprintf("x%d", i), X[,i])
     endloop
 
-    # Set a low learning rate
-    bundle opts = defbundle("learning_rate", 0.0002)
+    # Set a low learning rate and low early stopping threshold
+    bundle opts = _(early_stopping_strategy = "residual_corr_rel")
 endif
 
 # Run standard OLS as benchmark
@@ -99,7 +94,7 @@ series yhat = B.yhat    # Retrieve fitted values
 #gnuplot LHS yhat --output="display"
 
 # Plot correlations as a function of iterations
-#plot_rho_values(B)
+plot_rho_values(B)
 
 # Plot coefficient paths
 plot_coefficient_paths(B)

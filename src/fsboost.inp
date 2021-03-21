@@ -3,9 +3,9 @@ function bundle default_fsreg_opts (void)
 
     bundle self = null
     scalar self.verbose = 1
-    string self.type_score = "residual_corr_abs"
+    string self.early_stopping_strategy = "residual_corr_abs"
     add_early_stopping_threshold(&self)
-    scalar self.learning_rate = 0.025
+    scalar self.learning_rate = 0.01
     scalar self.max_num_iterations = 10000
     scalar self.early_stopping_rounds = 50
 
@@ -16,12 +16,12 @@ end function
 function void add_early_stopping_threshold (bundle *self)
     /* Add threshold for early stopping depending on early stopping type. */
 
-    if self.type_score == "residual_corr_abs"
+    if self.early_stopping_strategy == "residual_corr_abs"
         # Abs. correlation has to improve at minimum by x units.
-        scalar self.early_stopping_threshold = 0.0001
-    elif self.type_score == "residual_corr_rel"
+        scalar self.early_stopping_threshold = 0.01
+    elif self.early_stopping_strategy == "residual_corr_rel"
         # Abs. correlation has to improve at minimum relatively by x.
-        scalar self.early_stopping_threshold = 0.001
+        scalar self.early_stopping_threshold = 0.05
     endif
 end function
 
@@ -288,13 +288,14 @@ end function
 
 
 function void print_early_stopping_reached (const bundle self)
-    /* */
+    /* Print info message on early stopping*/
 
     if self.verbose > 0
-        printf "\nInfo: No improvement in correlation for the last %d iterations.\n Early stopping applies.\n", self.early_stopping_rounds
+        printf "\nInfo: No improvement in score '%s' for\n\
+                the last %d iterations.\nEarly stopping applies.\n",\
+                self.early_stopping_strategy, self.early_stopping_rounds
     endif
 end function
-
 
 
 function void print_iteration_details (const bundle self,
@@ -314,16 +315,18 @@ function scalar early_stopping_applies (const bundle self,
     /* Decision whether the early stopping criteria is met, or not.
      return: If the criteria is met, return TRUE, otherwise FALSE. */
 
-    if self.type_score == "residual_corr_abs"
+    if self.early_stopping_strategy == "residual_corr_abs"
         scalar delta = abs(score_former) - abs(score_current)
-        ret = (delta >= self.early_stopping_threshold) ? FALSE : TRUE
-    elif self.type_score == "residual_corr_rel"
+    elif self.early_stopping_strategy == "residual_corr_rel"
         scalar delta = ( abs(score_former) - abs(score_current) ) / \
                         abs(score_former)
-        ret = (delta >= self.early_stopping_threshold ? FALSE : TRUE)
     endif
 
-    return ret
+    if delta < 0    # correlation increased
+        return TRUE
+    else
+        return (delta >= self.early_stopping_threshold) ? FALSE : TRUE
+    endif
 end function
 
 
@@ -350,8 +353,13 @@ function void fsreg_estimator (bundle *self)
         yX[,1] = yX[,1] - delta * self.mX[, position]
 
         if i > 1    # early stopping
-            n_rounds_no_improvement += early_stopping_applies(self,\
-                                    self.rho_values[i-1], self.rho_values[i])
+            check = early_stopping_applies(self, self.rho_values[i-1],\
+                                            self.rho_values[i])
+            if check == TRUE
+                n_rounds_no_improvement++
+            else
+                n_rounds_no_improvement = 0  # reset
+            endif
         endif
 
         if n_rounds_no_improvement == self.early_stopping_rounds
@@ -442,8 +450,11 @@ end function
 function void print_fsboost_results (bundle self)
     /* Print results. */
 
-    printf "\nForward-stagewise regression results (no inference)"
     printf "\n-------------------------------------------------------\n"
+    printf "Forward-stagewise regression results (no inference)\n"
+    printf "Early stopping strategy: '%s' (c = %g)",\
+            self.early_stopping_strategy, self.early_stopping_threshold
+    printf "\n-------------------------------------------------------"
 
     strings label_str = array(0)
 
@@ -451,7 +462,12 @@ function void print_fsboost_results (bundle self)
       label_str += defarray("const")
     endif
     label_str += get_names_of_nonzero_coeffs(self)
-    label_str += defarray("Learning rate", "Number of iterations", "Correl. w. residuals", "S.E. of regression")
+    label_str += defarray(\
+                            "Learning rate",\
+                            "Number of iterations",\
+                            "Correl. w. residuals",\
+                            "S.E. of regression"\
+                        )
 
     matrix extra = self.learning_rate | self.actual_num_iterations |self.rho_values[self.actual_num_iterations] | sd(self.uhat)
 
