@@ -25,7 +25,7 @@ elif runEX == 2
     series LHS = 1
     series LHS = 4.5 + 0.8*LHS(-1) - 0.4*LHS(-2) + e
     matrix X = mnormal($nobs, k)		# further exogenous
-    list RHS = const LHS(-1 to -6)		# arbtrary lags of the endogenous
+    list RHS = const LHS(-1 to -6)		# arbitrary lags of the endogenous
     loop i=1..cols(X) -q
         RHS += genseries(sprintf("S%d", $i), X[,i])
     endloop
@@ -37,7 +37,7 @@ elif runEX == 3
 
     series LHS = WW
     list RHS = const dataset
-    RHS -= LHS WW     # drop lhs varianbe
+    RHS -= LHS WW     # drop lhs variable
 
     # Set a low learning rate
     bundle opts = _(learning_rate = 0.025)

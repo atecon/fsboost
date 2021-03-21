@@ -2,8 +2,8 @@
 <gretl-functions>
 <gretl-function-package name="fsboost" minver="2020b" lives-in-subdir="true">
 <author email="atecon@posteo.de">Artur Tarassow</author>
-<version>0.1</version>
-<date>2020-09-05</date>
+<version>0.2</version>
+<date>2021-03-21</date>
 <description>Forward-stagewise boosted regression estimates</description>
 <tags>C13 C52</tags>
 <label>Forward Stagewise</label>
@@ -38,6 +38,7 @@ endif
 string self.yname = argname(y)
 strings self.Xnames = varnames(X)
 initialize(&amp;self, y, X)
+add_early_stopping_threshold(&amp;self)
 stdize_y_and_x(&amp;self)
 fsreg_estimator(&amp;self)
 post_process(&amp;self)
@@ -62,14 +63,16 @@ return self
   <param name="self" type="bundle"/>
  </params>
 <code>/* Print results. */
-printf &quot;\nForward-stagewise regression results (no inference)&quot;
 printf &quot;\n-------------------------------------------------------\n&quot;
+printf &quot;Forward-stagewise regression results (no inference)\n&quot;
+printf &quot;Early stopping strategy: '%s' (c = %g)&quot;, self.early_stopping_strategy, self.early_stopping_threshold
+printf &quot;\n-------------------------------------------------------&quot;
 strings label_str = array(0)
 if self.with_constant
   label_str += defarray(&quot;const&quot;)
 endif
 label_str += get_names_of_nonzero_coeffs(self)
-label_str += defarray(&quot;Learning rate&quot;, &quot;Number of iterations&quot;, &quot;Correl. w. residuals&quot;, &quot;S.E. of regression&quot;)
+label_str += defarray( &quot;Learning rate&quot;, &quot;Number of iterations&quot;, &quot;Correl. w. residuals&quot;, &quot;S.E. of regression&quot; )
 matrix extra = self.learning_rate | self.actual_num_iterations |self.rho_values[self.actual_num_iterations] | sd(self.uhat)
 if ok(self.r2)
   matrix extra |= self.r2
@@ -157,10 +160,10 @@ end plot --output=&quot;@filename&quot;
   <param name="learning_rate" type="scalar" min="0.0001" max="0.9999" default="0.025" const="true">
 <description>Learning rate</description>
   </param>
-  <param name="max_num_iterations" type="int" min="100" default="10000" const="true">
+  <param name="max_num_iterations" type="int" min="100" default="10000">
 <description>Max. number of iterations</description>
   </param>
-  <param name="early_stopping_rounds" type="int" min="20" default="50" const="true">
+  <param name="early_stopping_rounds" type="int" min="20" default="50">
 <description>Early stopping rounds</description>
   </param>
   <param name="plot_coefficient_paths" type="bool" default="0" const="true">
@@ -169,7 +172,7 @@ end plot --output=&quot;@filename&quot;
   <param name="plot_rho_values" type="bool" default="0" const="true">
 <description>Plot correlation w. residuals</description>
   </param>
-  <param name="verbose" type="int" min="0" max="2" default="1" const="true">
+  <param name="verbose" type="int" min="0" max="2" default="1">
 <description>Print details</description>
 <labels count="3">
 "quiet" "details" "more details" </labels>
@@ -218,10 +221,26 @@ return lincomb(X, bhat)
 <code>/* Set default values */
 bundle self = null
 scalar self.verbose = 1
-scalar self.learning_rate = 0.025
+string self.early_stopping_strategy = &quot;residual_corr_abs&quot;
+add_early_stopping_threshold(&amp;self)
+scalar self.learning_rate = 0.01
 scalar self.max_num_iterations = 10000
 scalar self.early_stopping_rounds = 50
 return self
+</code>
+</gretl-function>
+<gretl-function name="add_early_stopping_threshold" type="void" private="1">
+ <params count="1">
+  <param name="self" type="bundleref"/>
+ </params>
+<code>/* Add threshold for early stopping depending on early stopping type. */
+if self.early_stopping_strategy == &quot;residual_corr_abs&quot;
+  # Abs. correlation has to improve at minimum by x units.
+  scalar self.early_stopping_threshold = 0.01
+elif self.early_stopping_strategy == &quot;residual_corr_rel&quot;
+  # Abs. correlation has to improve at minimum relatively by x.
+  scalar self.early_stopping_threshold = 0.05
+endif
 </code>
 </gretl-function>
 <gretl-function name="stdize_y_and_x" type="void" private="1">
@@ -404,38 +423,6 @@ matrix mask = (self.coeff .!= 0)
 return selifr(self.coeff, mask)
 </code>
 </gretl-function>
-<gretl-function name="forward_stagewise" type="scalar" private="1">
- <params count="2">
-  <param name="self" type="bundle" const="true"/>
-  <param name="rho" type="scalar" const="true">
-<description>Correlation coefficient</description>
-  </param>
- </params>
-<code>/* Compute forward stagewise &quot;delta&quot; value. */
-return self.learning_rate * sgn(rho)
-</code>
-</gretl-function>
-<gretl-function name="update_beta" type="scalar" private="1">
- <params count="2">
-  <param name="beta" type="scalar" const="true"/>
-  <param name="delta" type="scalar" const="true"/>
- </params>
-<code>/* Update regression coefficient. */
-return beta + delta
-</code>
-</gretl-function>
-<gretl-function name="update_residuals" type="matrix" private="1">
- <params count="3">
-  <param name="residuals" type="matrix" const="true"/>
-  <param name="delta" type="scalar" const="true"/>
-  <param name="x" type="matrix" const="true">
-<description>j-th regressor</description>
-  </param>
- </params>
-<code>/* Update regression coefficient. */
-return residuals - delta * x
-</code>
-</gretl-function>
 <gretl-function name="get_max_correlation" type="scalar" private="1">
  <params count="2">
   <param name="yX" type="matrix" const="true"/>
@@ -453,16 +440,16 @@ return correlations[position]
  <params count="1">
   <param name="self" type="bundle" const="true"/>
  </params>
-<code>/* */
+<code>/* Print info message on early stopping*/
 if self.verbose &gt; 0
-  printf &quot;\nInfo: No improvement in correlation for the last %d iterations.\n Early stopping applies.\n&quot;, self.early_stopping_rounds
+  printf &quot;\nInfo: No improvement in score '%s' for\n                 the last %d iterations.\nEarly stopping applies.\n&quot;, self.early_stopping_strategy, self.early_stopping_rounds
 endif
 </code>
 </gretl-function>
 <gretl-function name="print_iteration_details" type="void" private="1">
  <params count="3">
   <param name="self" type="bundle" const="true"/>
-  <param name="iteration" type="int" const="true"/>
+  <param name="iteration" type="int"/>
   <param name="rho" type="scalar" const="true">
 <description>Correlation coeff.</description>
   </param>
@@ -470,6 +457,26 @@ endif
 <code>/* */
 if self.verbose == 2
   printf &quot;\nInfo: Iteration %d out of %d: correlation coeff. = %g.\n&quot;, iteration, self.max_num_iterations, rho
+endif
+</code>
+</gretl-function>
+<gretl-function name="early_stopping_applies" type="scalar" private="1">
+ <params count="3">
+  <param name="self" type="bundle" const="true"/>
+  <param name="score_former" type="scalar" const="true"/>
+  <param name="score_current" type="scalar" const="true"/>
+ </params>
+<code>/* Decision whether the early stopping criteria is met, or not.
+return: If the criteria is met, return TRUE, otherwise FALSE. */
+if self.early_stopping_strategy == &quot;residual_corr_abs&quot;
+  scalar delta = abs(score_former) - abs(score_current)
+elif self.early_stopping_strategy == &quot;residual_corr_rel&quot;
+  scalar delta = ( abs(score_former) - abs(score_current) ) / abs(score_former)
+endif
+if delta &lt; 0    # correlation increased
+  return TRUE
+else
+  return (delta &gt;= self.early_stopping_threshold) ? FALSE : TRUE
 endif
 </code>
 </gretl-function>
@@ -481,17 +488,25 @@ endif
 matrix yX = self.my ~ self.mX
 scalar n_rounds_no_improvement = 0
 scalar rho_value_former = NA
-loop i = 1..self.max_num_iterations
+scalar self.actual_num_iterations = 0
+loop i=1..self.max_num_iterations
   scalar position = NA
-  scalar self.actual_num_iterations = $i
-  scalar col = (i &gt; 1) ? i-1 : 1
+  self.actual_num_iterations++
+  scalar col = (i &gt; 1) ? (i-1) : 1
   self.rho_values[i] = get_max_correlation(yX, &amp;position)
   print_iteration_details(self, $i, self.rho_values[i])
-  scalar delta = forward_stagewise(self, self.rho_values[i])
-  self.betas[i, position] = update_beta(self.betas[i, position], delta)
-  yX[,1] = update_residuals(yX[,1], delta, self.mX[, position])
-  # early stopping
-  n_rounds_no_improvement += (i &gt; 1 &amp;&amp; self.rho_values[i-1] &lt;= self.rho_values[i]) ? 1 : n_rounds_no_improvement
+  delta = self.learning_rate * sgn(self.rho_values[i])
+  # update beta and residuals
+  self.betas[i, position] = self.betas[i, position] + delta
+  yX[,1] = yX[,1] - delta * self.mX[, position]
+  if i &gt; 1    # early stopping
+    check = early_stopping_applies(self, self.rho_values[i-1], self.rho_values[i])
+    if check == TRUE
+      n_rounds_no_improvement++
+    else
+      n_rounds_no_improvement = 0  # reset
+    endif
+  endif
   if n_rounds_no_improvement == self.early_stopping_rounds
     print_early_stopping_reached(self)
     break
@@ -522,7 +537,6 @@ set verbose off
 clear
 include fsboost.gfn
 
-
 scalar runEX = 1		# select an example
 
 # Select an example
@@ -533,8 +547,8 @@ if runEX == 1
     series LHS = ldiff(PAU)
     list RHS = const LHS(-1 to -2) IUS(-1 to -2)  IAU(-1 to -2)
 
-    # Optional: set learning rate
-    bundle opts = defbundle(&quot;learning_rate&quot;, 0.05)
+    # Optional: set learning rate a bit higher
+    bundle opts = _(learning_rate = 0.025)
 
 elif runEX == 2
     # SIMULATION
@@ -546,7 +560,7 @@ elif runEX == 2
     series LHS = 1
     series LHS = 4.5 + 0.8*LHS(-1) - 0.4*LHS(-2) + e
     matrix X = mnormal($nobs, k)		# further exogenous
-    list RHS = const LHS(-1 to -6)		# arbtrary lags of the endogenous
+    list RHS = const LHS(-1 to -6)		# arbitrary lags of the endogenous
     loop i=1..cols(X) -q
         RHS += genseries(sprintf(&quot;S%d&quot;, $i), X[,i])
     endloop
@@ -558,10 +572,10 @@ elif runEX == 3
 
     series LHS = WW
     list RHS = const dataset
-    RHS -= LHS WW     # drop lhs varianbe
+    RHS -= LHS WW     # drop lhs variable
 
     # Set a low learning rate
-    bundle opts = defbundle(&quot;learning_rate&quot;, 0.0002)
+    bundle opts = _(learning_rate = 0.025)
 
 elif runEX == 4             # example taken from Allin's regls pckg.
 
@@ -587,8 +601,8 @@ elif runEX == 4             # example taken from Allin's regls pckg.
       RHS += genseries(sprintf(&quot;x%d&quot;, i), X[,i])
     endloop
 
-    # Set a low learning rate
-    bundle opts = defbundle(&quot;learning_rate&quot;, 0.0002)
+    # Set a low learning rate and low early stopping threshold
+    bundle opts = _(early_stopping_strategy = &quot;residual_corr_rel&quot;)
 endif
 
 # Run standard OLS as benchmark
@@ -615,7 +629,7 @@ series yhat = B.yhat    # Retrieve fitted values
 #gnuplot LHS yhat --output=&quot;display&quot;
 
 # Plot correlations as a function of iterations
-#plot_rho_values(B)
+plot_rho_values(B)
 
 # Plot coefficient paths
 plot_coefficient_paths(B)
