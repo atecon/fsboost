@@ -261,15 +261,6 @@ function matrix get_nonzero_rescaled_coeffs (const bundle self)
 end function
 
 
-function matrix update_residuals (const matrix residuals,
-                                  const scalar delta,
-                                  const matrix x "j-th regressor")
-    /* Update regression coefficient. */
-
-    return residuals - delta * x
-end function
-
-
 function scalar get_max_correlation (const matrix yX, scalar *position "j-th regressor")
     /* Compute correlations between "y" and all exogenous variables ("X"). Return maximum of absolute correlations. */
 
@@ -319,8 +310,9 @@ function void fsreg_estimator (bundle *self)
         print_iteration_details(self, $i, self.rho_values[i])
         delta = self.learning_rate * sgn(self.rho_values[i])
 
+        # update beta and residuals
         self.betas[i, position] = self.betas[i, position] + delta
-        yX[,1] = update_residuals(yX[,1], delta, self.mX[, position])
+        yX[,1] = yX[,1] - delta * self.mX[, position]
 
         # early stopping
         n_rounds_no_improvement += (i > 1 && self.rho_values[i-1] <= self.rho_values[i]) ? 1 : n_rounds_no_improvement
