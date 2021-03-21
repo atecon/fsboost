@@ -2,9 +2,11 @@ set verbose off
 clear
 
 include assertion.gfn
+set assert stop
 
 include "./src/fsboost.inp" --force
-include ridge.gfn --force
+include ridge.gfn
+include string_utils.gfn
 
 
 function void test_default_fsreg_opts (void)
@@ -12,11 +14,12 @@ function void test_default_fsreg_opts (void)
 
     bundle B = default_fsreg_opts()
 
-    assert_equal_num(nelem(B), 4)
-    assert_equal_num(B.verbose, 1)
-    assert_equal_num(B.learning_rate, 0.025)
-    assert_equal_num(B.max_num_iterations, 10000)
-    assert_equal_num(B.early_stopping_rounds, 50)
+    assert(B.verbose == 1)
+    assert(B.learning_rate == 0.01)
+    assert(B.max_num_iterations == 10000)
+    assert(B.early_stopping_rounds == 50)
+    assert(B.early_stopping_threshold == 0.01)
+    assert(B.early_stopping_strategy == "residual_corr_abs")
 end function
 test_default_fsreg_opts()
 
@@ -31,25 +34,25 @@ function void test_initialize (const series y, const list L)
     scalar B.max_num_iterations = 10000
     initialize(&B, y, L)
 
-    assert_true(inbundle(B, "T"))
-    assert_true(inbundle(B, "y"))
-    assert_true(inbundle(B, "X_wo_constant"))
-    assert_true(inbundle(B, "with_constant"))
-    assert_true(inbundle(B, "Xnames_wo_constant"))
-    assert_true(inbundle(B, "resid_mean"))
-    assert_true(inbundle(B, "rho_values"))
-    assert_true(inbundle(B, "betas"))
-    assert_true(inbundle(B, "actual_num_iterations"))
+    assert(inbundle(B, "T") != FALSE)
+    assert(inbundle(B, "y") != FALSE)
+    assert(inbundle(B, "X_wo_constant") != FALSE)
+    assert(inbundle(B, "with_constant") != FALSE)
+    assert(inbundle(B, "Xnames_wo_constant") != FALSE)
+    assert(inbundle(B, "resid_mean") != FALSE)
+    assert(inbundle(B, "rho_values") != FALSE)
+    assert(inbundle(B, "betas") != FALSE)
+    assert(inbundle(B, "actual_num_iterations") != FALSE)
 
-    assert_equal_num(B.T, $nobs)
-    assert_true(B.with_constant)
-    assert_equal_num(nelem(B.X_wo_constant), nelem(L)-1)
-    assert_equal_num(B.resid_mean, 0)
-    assert_false(ok(B.actual_num_iterations))
-    assert_equal_num(cols(B.rho_values), 1)
-    assert_equal_num(rows(B.rho_values), B.max_num_iterations)
-    assert_equal_num(rows(B.betas), B.max_num_iterations)
-    assert_equal_num(cols(B.betas), nelem(B.X_wo_constant))
+    assert(B.T == $nobs)
+    assert(B.with_constant == TRUE)
+    assert(nelem(B.X_wo_constant) == (nelem(L)-1))
+    assert(B.resid_mean == 0)
+    assert(ok(B.actual_num_iterations) == FALSE)
+    assert(cols(B.rho_values) == 1)
+    assert(rows(B.rho_values) == B.max_num_iterations)
+    assert(rows(B.betas) == B.max_num_iterations)
+    assert(cols(B.betas) == nelem(B.X_wo_constant))
 end function
 test_initialize(LRM, L)
 
@@ -65,12 +68,12 @@ function void test_stdize_y_and_x (const series y, const list L)
 
     stdize_y_and_x(&B)
 
-    assert_true(inbundle(B, "my"))
-    assert_true(inbundle(B, "mX"))
-    assert_true(inbundle(B, "y"))
-    assert_true(inbundle(B, "X_wo_constant"))
-    assert_true(inbundle(B, "ysd"))
-    assert_true(inbundle(B, "Xsd"))
+    assert(inbundle(B, "my") != FALSE)
+    assert(inbundle(B, "mX") != FALSE)
+    assert(inbundle(B, "y") != FALSE)
+    assert(inbundle(B, "X_wo_constant") != FALSE)
+    assert(inbundle(B, "ysd") != FALSE)
+    assert(inbundle(B, "Xsd") != FALSE)
 
     assert_almost_equal_num(B.ysd, 0.150966)
 end function
@@ -86,7 +89,7 @@ function void test_get_max_correlation (void)
     scalar pos = 0
 
     scalar rho = get_max_correlation(yX, &pos)
-    assert_equal_num(pos, 2)
+    assert(pos == 2)
     assert_almost_equal_num(rho, 0.15986581)
 
     # 2nd draw
@@ -95,7 +98,7 @@ function void test_get_max_correlation (void)
     scalar pos = 0
 
     scalar rho = get_max_correlation(yX, &pos)
-    assert_equal_num(pos, 11)
+    assert(pos == 11)
     assert_almost_equal_num(rho, 0.17891685)
 end function
 test_get_max_correlation()
@@ -165,7 +168,7 @@ function void test_fsboost_predict (const list L)
     list X = IDE LRY IBO
     matrix pred = fsboost_predict(X, B)
 
-    assert_false(ok(pred)[1])
+    assert(ok(pred)[1] == FALSE)
 
     # Without intercept, number of regressors correct but coefficient
     # vector to long
@@ -176,7 +179,7 @@ function void test_fsboost_predict (const list L)
     list X = IDE LRY IBO
     matrix pred = fsboost_predict(X, B)
 
-    assert_false(ok(pred)[1])
+    assert(ok(pred)[1] == FALSE)
 
 
     # With intercept, number of regressors correct
