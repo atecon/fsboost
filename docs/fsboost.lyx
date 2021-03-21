@@ -158,6 +158,28 @@ Version 0.2 (March, 2021)
 update docs on early stopping and the learning rate
 \end_layout
 
+\begin_layout Itemize
+
+\size footnotesize
+add two new configurable early stopping rules: 
+\begin_inset Quotes eld
+\end_inset
+
+residual_corr_rel
+\begin_inset Quotes erd
+\end_inset
+
+ and 
+\begin_inset Quotes eld
+\end_inset
+
+residual_corr_abs
+\begin_inset Quotes erd
+\end_inset
+
+
+\end_layout
+
 \end_deeper
 \begin_layout Itemize
 
@@ -646,7 +668,7 @@ Early stopping rules are important for two reasons: First, one wants to
 \end_layout
 
 \begin_layout Standard
-The implemented 
+Before version 0.2, the implemented 
 \emph on
 early stopping 
 \emph default
@@ -722,6 +744,93 @@ Correlation dynamics between the updated residuals and the most correlated
 \end_inset
 
 
+\end_layout
+
+\begin_layout Standard
+Since version 0.2 two additional more sophisticated early stopping rules
+ are implemented:
+\end_layout
+
+\begin_layout Enumerate
+
+\series bold
+residual_corr_abs
+\series default
+: Check that the absolute correlation, 
+\begin_inset Formula $|<r,x_{j}^{i}>|$
+\end_inset
+
+, decreases at least by some minimum value, 
+\begin_inset Formula $\text{\underbar{c}}$
+\end_inset
+
+.
+ The early stopping indicator function follows the following rule:
+\begin_inset Formula 
+\[
+I=\begin{cases}
+0 & \text{if}\;\Delta|<r,x_{j}^{i}>|\geq\text{\underbar{c}}\\
+1 & \text{if}\;\Delta|<r,x_{j}^{i}>|<\text{\underbar{c}}
+\end{cases}
+\]
+
+\end_inset
+
+where 
+\begin_inset Formula $\Delta$
+\end_inset
+
+ refers to the change in the statistics between the stagewise iterations
+ 
+\begin_inset Formula $i$
+\end_inset
+
+ and 
+\begin_inset Formula $i-1$
+\end_inset
+
+, respectively.
+ The default value for 
+\begin_inset Formula $\text{\underbar{c}}$
+\end_inset
+
+ is 0.01.
+\end_layout
+
+\begin_layout Enumerate
+
+\series bold
+residual_corr_rel
+\series default
+: Check that the relative change in the absolute correlation, 
+\begin_inset Formula $|<r,x_{j}^{i}>|$
+\end_inset
+
+, decreases at least by some minimum value, 
+\begin_inset Formula $\text{\underbar{c}}$
+\end_inset
+
+.
+ The early stopping indicator function follows the following rule:
+\begin_inset Formula 
+\[
+I=\begin{cases}
+0 & \text{if}\;\frac{\Delta|<r,x_{j}^{i}>|}{|<r,x_{j}^{i-1}>|}\geq\text{\underbar{c}}\\
+1 & \text{if}\;\frac{\Delta|<r,x_{j}^{i}>|}{|<r,x_{j}^{i-1}>|}<\text{\underbar{c}}
+\end{cases}
+\]
+
+\end_inset
+
+The default value for 
+\begin_inset Formula $\text{\underbar{c}}$
+\end_inset
+
+ is 0.05.
+\end_layout
+
+\begin_layout Standard
+Both early stopping rules yield much faster convergence.
 \end_layout
 
 \begin_layout Section
@@ -1884,7 +1993,7 @@ status open
 \begin_layout Plain Layout
 \align center
 \begin_inset Tabular
-<lyxtabular version="3" rows="26" columns="2">
+<lyxtabular version="3" rows="28" columns="2">
 <features tabularvalignment="middle">
 <column alignment="left" valignment="top">
 <column alignment="left" valignment="top">
@@ -2001,6 +2110,28 @@ Learning rate
 </cell>
 </row>
 <row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+early_stopping_strategy
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+String referring to some early stopping strategy
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
 <cell alignment="left" valignment="top" topline="true" leftline="true" usebox="none">
 \begin_inset Text
 
@@ -2017,6 +2148,28 @@ early_stopping_rounds
 
 \begin_layout Plain Layout
 Number of iterations of no improvement before stopping
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+early_stopping_threshold
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Scalar setting the threshold for a minimum improvement in some score
 \end_layout
 
 \end_inset
@@ -2549,7 +2702,7 @@ status open
 \begin_layout Plain Layout
 \align center
 \begin_inset Tabular
-<lyxtabular version="3" rows="6" columns="4">
+<lyxtabular version="3" rows="11" columns="4">
 <features tabularvalignment="middle">
 <column alignment="left" valignment="top">
 <column alignment="left" valignment="top">
@@ -2639,7 +2792,7 @@ Learning rate;
 \begin_inset Text
 
 \begin_layout Plain Layout
-0.025
+0.01
 \end_layout
 
 \end_inset
@@ -2680,6 +2833,143 @@ Number of the maximum iterations
 
 \begin_layout Plain Layout
 10000
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+early_stopping_strategy
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+string
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+Early stopping strategy:
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+\begin_inset Quotes eld
+\end_inset
+
+residual_corr_abs
+\begin_inset Quotes erd
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+\begin_inset Quotes eld
+\end_inset
+
+residual_corr_abs
+\begin_inset Quotes erd
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+\begin_inset Quotes eld
+\end_inset
+
+residual_corr_rel
+\begin_inset Quotes erd
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
 \end_layout
 
 \end_inset
@@ -2758,6 +3048,100 @@ before stopping
 
 \begin_layout Plain Layout
 
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\family typewriter
+early_stopping_rounds
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+scalar
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+For strategy 
+\begin_inset Quotes eld
+\end_inset
+
+residual_corr_abs
+\begin_inset Quotes erd
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" topline="true" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+0.01
+\end_layout
+
+\end_inset
+</cell>
+</row>
+<row>
+<cell alignment="center" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" leftline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+For strategy 
+\begin_inset Quotes eld
+\end_inset
+
+residual_corr_rel
+\begin_inset Quotes erd
+\end_inset
+
+
+\end_layout
+
+\end_inset
+</cell>
+<cell alignment="center" valignment="top" leftline="true" rightline="true" usebox="none">
+\begin_inset Text
+
+\begin_layout Plain Layout
+0.05
 \end_layout
 
 \end_inset
