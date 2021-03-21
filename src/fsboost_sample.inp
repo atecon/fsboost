@@ -1,7 +1,11 @@
 set verbose off
 clear
-include fsboost.gfn
+#include fsboost.gfn
+include "/home/at/git/ridge/src/ridge.inp" --force
+include "/home/at/git/fsboost/src/fsboost.inp" --force
 
+include string_utils.gfn
+include ridge.gfn
 
 scalar runEX = 1		# select an example
 

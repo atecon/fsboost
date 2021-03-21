@@ -113,18 +113,6 @@ end function
 test_print_iteration_details()
 
 
-function void test_update_beta (void)
-    print "Start testing update_beta()"
-
-    scalar beta = 1
-    scalar delta = 2
-    scalar beta_new = update_beta(1, 2)
-
-    assert_equal_num(beta_new, 3)
-end function
-test_update_beta()
-
-
 open denmark.gdt -q -p
 function void test_add_sd_of_uhat (const series y)
     print "Start testing add_sd_of_uhat()"
