@@ -3,11 +3,26 @@ function bundle default_fsreg_opts (void)
 
     bundle self = null
     scalar self.verbose = 1
+    string self.type_score = "residual_corr_abs"
+    add_early_stopping_threshold(&self)
     scalar self.learning_rate = 0.025
     scalar self.max_num_iterations = 10000
     scalar self.early_stopping_rounds = 50
 
     return self
+end function
+
+
+function void add_early_stopping_threshold (bundle *self)
+    /* Add threshold for early stopping depending on early stopping type. */
+
+    if self.type_score == "residual_corr_abs"
+        # Abs. correlation has to improve at minimum by x units.
+        scalar self.early_stopping_threshold = 0.0001
+    elif self.type_score == "residual_corr_rel"
+        # Abs. correlation has to improve at minimum relatively by x.
+        scalar self.early_stopping_threshold = 0.001
+    endif
 end function
 
 
@@ -93,6 +108,7 @@ function bundle fsreg (const series y "Dep. variable",
     string self.yname = argname(y)
     strings self.Xnames = varnames(X)
     initialize(&self, y, X)
+    add_early_stopping_threshold(&self)
 
     stdize_y_and_x(&self)
     fsreg_estimator(&self)
@@ -292,6 +308,25 @@ function void print_iteration_details (const bundle self,
 end function
 
 
+function scalar early_stopping_applies (const bundle self,
+                                        const scalar score_former,
+                                        const scalar score_current)
+    /* Decision whether the early stopping criteria is met, or not.
+     return: If the criteria is met, return TRUE, otherwise FALSE. */
+
+    if self.type_score == "residual_corr_abs"
+        scalar delta = abs(score_former) - abs(score_current)
+        ret = (delta >= self.early_stopping_threshold) ? FALSE : TRUE
+    elif self.type_score == "residual_corr_rel"
+        scalar delta = ( abs(score_former) - abs(score_current) ) / \
+                        abs(score_former)
+        ret = (delta >= self.early_stopping_threshold ? FALSE : TRUE)
+    endif
+
+    return ret
+end function
+
+
 function void fsreg_estimator (bundle *self)
     /* Actual implementation of the boosting-like forward stagewise algorithm. */
 
@@ -314,8 +349,10 @@ function void fsreg_estimator (bundle *self)
         self.betas[i, position] = self.betas[i, position] + delta
         yX[,1] = yX[,1] - delta * self.mX[, position]
 
-        # early stopping
-        n_rounds_no_improvement += (i > 1 && self.rho_values[i-1] <= self.rho_values[i]) ? 1 : n_rounds_no_improvement
+        if i > 1    # early stopping
+            n_rounds_no_improvement += early_stopping_applies(self,\
+                                    self.rho_values[i-1], self.rho_values[i])
+        endif
 
         if n_rounds_no_improvement == self.early_stopping_rounds
             print_early_stopping_reached(self)
