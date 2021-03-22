@@ -549,7 +549,7 @@ if runEX == 1
     list RHS = const LHS(-1 to -2) IUS(-1 to -2)  IAU(-1 to -2)
 
     # Optional: set learning rate a bit higher
-    bundle opts = defbundle(learning_rate = 0.025)
+    bundle opts = defbundle(&quot;learning_rate&quot;, 0.025)
 
 elif runEX == 2
     # SIMULATION
@@ -576,7 +576,7 @@ elif runEX == 3
     RHS -= LHS WW     # drop lhs variable
 
     # Set a low learning rate
-    bundle opts = defbundle(learning_rate = 0.025)
+    bundle opts = defbundle(&quot;learning_rate&quot;, 0.025)
 
 elif runEX == 4             # example taken from Allin's regls pckg.
 
@@ -603,7 +603,7 @@ elif runEX == 4             # example taken from Allin's regls pckg.
     endloop
 
     # Set a low learning rate and low early stopping threshold
-    bundle opts = defbundle(early_stopping_strategy = &quot;residual_corr_rel&quot;)
+    bundle opts = defbundle(&quot;early_stopping_strategy&quot;, &quot;residual_corr_rel&quot;)
 endif
 
 # Run standard OLS as benchmark
