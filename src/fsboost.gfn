@@ -431,8 +431,13 @@ return selifr(self.coeff, mask)
 <description>j-th regressor</description>
   </param>
  </params>
-<code>/* Compute correlations between &quot;y&quot; and all exogenous variables (&quot;X&quot;). Return maximum of absolute correlations. */
-matrix correlations = mcorr(yX)[2:, 1]      # assume that 1st column refers to endogenous
+<code>/* Compute correlations between &quot;y&quot; and all exogenous variables (&quot;X&quot;).
+Return maximum of absolute correlations. */
+scalar k = cols(yX) - 1
+matrix correlations = mshape(NA, k, 1)
+loop i=1..k
+  correlations[i] = mcorr(yX[,1] ~ yX[,1+i])[1,2]
+endloop
 scalar position = imaxc(abs(correlations))
 return correlations[position]
 </code>

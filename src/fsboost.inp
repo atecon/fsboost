@@ -296,10 +296,17 @@ function matrix get_nonzero_rescaled_coeffs (const bundle self)
 end function
 
 
-function scalar get_max_correlation (const matrix yX, scalar *position "j-th regressor")
-    /* Compute correlations between "y" and all exogenous variables ("X"). Return maximum of absolute correlations. */
+function scalar get_max_correlation (const matrix yX,
+                                     scalar *position "j-th regressor")
+    /* Compute correlations between "y" and all exogenous variables ("X").
+     Return maximum of absolute correlations. */
 
-    matrix correlations = mcorr(yX)[2:, 1]      # assume that 1st column refers to endogenous
+    scalar k = cols(yX) - 1
+    matrix correlations = mshape(NA, k, 1)
+
+    loop i=1..k
+        correlations[i] = mcorr(yX[,1] ~ yX[,1+i])[1,2]
+    endloop
     scalar position = imaxc(abs(correlations))
 
     return correlations[position]
