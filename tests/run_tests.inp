@@ -199,21 +199,3 @@ end function
 test_fsboost_predict(L)
 
 
-
-/* CURRENTLY NOT TESTABLE AS r2_stats() called by compute_r_squares() is part of the ridge package. Just an "include ridge.gfn" is not sufficient. Why?
-open denmark.gdt -q -p
-function void test_compute_r_squares (const matrix y,
-                                      const matrix x)
-    print "Start testing compute_r_squares()"
-
-    bundle B = null
-    matrix B.my = y
-    matrix B.yhat = x
-    scalar B.ncoeff = 5
-
-    compute_r_squares(&B)
-    assert_equal_num(nelem(B), 4)
-    assert_true(inbundle(B, "r2_qcorr"))
-end function
-test_compute_r_squares({LRM}, {LRY})
-*/

@@ -61,8 +61,8 @@ function bundle fsreg_gui (const series y "Dep. variable",
                            const scalar learning_rate[0.0001:0.9999:0.025] "Learning rate",
                            int max_num_iterations[100::10000] "Max. number of iterations",
                            int early_stopping_rounds[20::50] "Early stopping rounds",
-                           const bool plot_coefficient_paths[0] "Plot coefficient paths",
-                           const bool plot_rho_values[0] "Plot correlation w. residuals",
+                           bool plot_coefficient_paths[0] "Plot coefficient paths",
+                           bool plot_rho_values[0] "Plot correlation w. residuals",
                            int verbose[0:2:1] "Print details" {"quiet", "details", "more details"})
     /* GUI wrapper for fsreg(). */
 
@@ -115,7 +115,7 @@ function bundle fsreg (const series y "Dep. variable",
     post_process(&self)
 
     # Handle intercept: non-scaled as "coeff" is already re-scaled
-    matrix resids = get_residuals({y}, {self.X_wo_constant}, self.coeff)
+    matrix resids = {y - lincomb(self.X_wo_constant, self.coeff)}
     if self.with_constant
         scalar self.resid_mean = meanc(resids)
         self.coeff = self.resid_mean | self.coeff
@@ -143,7 +143,7 @@ function void post_estimation_statistics (bundle *self)
 
   add_sd_of_uhat(&self)
   add_first_order_residual_corr(&self)
-  compute_r_squares(&self)
+  get_insample_stats(&self)
 end function
 
 
@@ -189,10 +189,27 @@ function void add_yhat_and_uhat_to_bundle (const series y,
 end function
 
 
-function void compute_r_squares (bundle *self)
-    /* Wrapper calling functions for computing R^2.
-    Function r2_stats() is taken from the "ridge" package.
-    TODO: Currently, we only know that stuff is statistically applicable for statistics "r2_qcorr". */
+function void get_insample_stats (bundle *self)
+    /* Collect insample statistics of fit. */
+
+    # from regls pkg.
+    matrix stats = regls_get_stats(self.y, self.yhat)
+    pos_mse = instrings(cnameget(stats), "MSE")
+    pos_r2 = instrings(cnameget(stats), "R^2")
+    self.r2 = stats[pos_r2]
+    self.mse = stats[pos_mse]
+
+    # from ridge pkg
+    matrix r_squares = r2_stats(self.my, {self.yhat}, self.ncoeff)
+    scalar self.r2_qcorr = r_squares[1]
+end function
+
+
+/*
+function void get_insample_stats (bundle *self)
+    #Wrapper calling functions for computing R^2.
+    #Function r2_stats() is taken from the "ridge" package.
+    #TODO: Currently, we only know that stuff is statistically applicable for statistics "r2_qcorr".
 
     scalar self.r2_qcorr = NA
 
@@ -202,14 +219,16 @@ function void compute_r_squares (bundle *self)
     #scalar self.r2_qcorr_adj = r_squares[2]          # depends on self.ncoeff
     #scalar self.r2_scores = r_squares[3]
 end function
+*/
 
 
+/*
 function scalar get_rsquare (const bundle self)
-    /* Alternative computation of R-squared statistics. */
+    # Alternative computation of R-squared statistics.
 
     return 1 - sum((self.y - self.yhat)^2) / sst(self.y)
 end function
-
+*/
 
 function void cleanup_bundle (bundle *self)
     /* Drop unnecessary stuff from bundle */
@@ -372,7 +391,7 @@ end function
 
 function void plot_coefficient_paths (bundle self,
                                       string filename[null] "Path + filename to store figure",
-                                      const bool ylog_scale[0])
+                                      bool ylog_scale[0])
     /* Plot coefficient paths. */
 
     string title = "Forward stagewise coefficient paths"
@@ -391,6 +410,7 @@ function void plot_coefficient_paths (bundle self,
       linestyles += sprintf("set style line %d ps 0.02\n", $i)
     endloop
 
+    set force_decpoint on
     plot mplot
         options with-lp time-series single-yaxis @ylog_scale_str
         printf "@linestyles"
@@ -401,12 +421,13 @@ function void plot_coefficient_paths (bundle self,
         printf "set ylabel '%s' font \", %d\"", ylabel, fontsize
         printf "set yrange[%g:%g]", min(mplot)*1.1, max(mplot)*1.1
     end plot --output="@filename"
+    set force_decpoint off
 end function
 
 
 function void plot_rho_values (bundle self,
                                string filename[null] "Path + filename to store figure",
-                               const bool absolute_values[1])
+                               bool absolute_values[1])
     /* Plot correlation coefficients. */
 
     string title = "Forward stagewise correlation values"
@@ -415,6 +436,7 @@ function void plot_rho_values (bundle self,
     string filename = (exists(filename)) ? filename : "display"
     matrix mplot = (absolute_values == TRUE) ? abs(self.rho_values) : self.rho_values
 
+    set force_decpoint on
     plot mplot
         options with-lines time-series
         literal set linetype 1 lc rgb "black" lw 1
@@ -424,6 +446,7 @@ function void plot_rho_values (bundle self,
         printf "set xlabel 'Iterations' font \", %d\"", fontsize
         printf "set ylabel '%s' font \", %d\"", ylabel, fontsize
     end plot --output="@filename"
+    set force_decpoint off
 end function
 
 
@@ -479,7 +502,10 @@ function void print_fsboost_results (bundle self)
       matrix extra |= self.r2_qcorr
       label_str += defarray("R-squared alt.")
     endif
-
+    if ok(self.mse)
+      matrix extra |= self.mse
+      label_str += defarray("MSE")
+    endif
     if inbundle(self, "uhat_first_order_corr")
       matrix extra |= self.uhat_first_order_corr
       label_str += defarray("rho")

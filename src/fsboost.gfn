@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <gretl-functions>
-<gretl-function-package name="fsboost" minver="2020b" lives-in-subdir="true">
+<gretl-function-package name="fsboost" minver="2020e" lives-in-subdir="true">
 <author email="atecon@posteo.de">Artur Tarassow</author>
 <version>0.2</version>
-<date>2021-03-21</date>
+<date>2021-03-22</date>
 <description>Forward-stagewise boosted regression estimates</description>
 <tags>C13 C52</tags>
 <label>Forward Stagewise</label>
@@ -11,8 +11,8 @@
 <help>
 pdfdoc:fsboost.pdf
 </help>
-<depends count="2">
-ridge string_utils </depends>
+<depends count="3">
+ridge string_utils regls </depends>
 <provider>ridge</provider>
 <gretl-function name="fsreg" type="bundle">
  <params count="3">
@@ -43,7 +43,7 @@ stdize_y_and_x(&amp;self)
 fsreg_estimator(&amp;self)
 post_process(&amp;self)
 # Handle intercept: non-scaled as &quot;coeff&quot; is already re-scaled
-matrix resids = get_residuals({y}, {self.X_wo_constant}, self.coeff)
+matrix resids = {y - lincomb(self.X_wo_constant, self.coeff)}
 if self.with_constant
   scalar self.resid_mean = meanc(resids)
   self.coeff = self.resid_mean | self.coeff
@@ -82,6 +82,10 @@ if ok(self.r2_qcorr)
   matrix extra |= self.r2_qcorr
   label_str += defarray(&quot;R-squared alt.&quot;)
 endif
+if ok(self.mse)
+  matrix extra |= self.mse
+  label_str += defarray(&quot;MSE&quot;)
+endif
 if inbundle(self, &quot;uhat_first_order_corr&quot;)
   matrix extra |= self.uhat_first_order_corr
   label_str += defarray(&quot;rho&quot;)
@@ -96,7 +100,7 @@ modprint bhat label_str extra
   <param name="filename" type="string" optional="true">
 <description>Path + filename to store figure</description>
   </param>
-  <param name="absolute_values" type="bool" default="1" const="true"/>
+  <param name="absolute_values" type="bool" default="1"/>
  </params>
 <code>/* Plot correlation coefficients. */
 string title = &quot;Forward stagewise correlation values&quot;
@@ -104,6 +108,7 @@ string ylabel = (absolute_values == FALSE) ? &quot;Correlations w. residuals&quo
 scalar fontsize = 12
 string filename = (exists(filename)) ? filename : &quot;display&quot;
 matrix mplot = (absolute_values == TRUE) ? abs(self.rho_values) : self.rho_values
+set force_decpoint on
 plot mplot
   options with-lines time-series
   literal set linetype 1 lc rgb &quot;black&quot; lw 1
@@ -113,6 +118,7 @@ plot mplot
   printf &quot;set xlabel 'Iterations' font \&quot;, %d\&quot;&quot;, fontsize
   printf &quot;set ylabel '%s' font \&quot;, %d\&quot;&quot;, ylabel, fontsize
 end plot --output=&quot;@filename&quot;
+set force_decpoint off
 </code>
 </gretl-function>
 <gretl-function name="plot_coefficient_paths" type="void">
@@ -121,7 +127,7 @@ end plot --output=&quot;@filename&quot;
   <param name="filename" type="string" optional="true">
 <description>Path + filename to store figure</description>
   </param>
-  <param name="ylog_scale" type="bool" default="0" const="true"/>
+  <param name="ylog_scale" type="bool" default="0"/>
  </params>
 <code>/* Plot coefficient paths. */
 string title = &quot;Forward stagewise coefficient paths&quot;
@@ -137,6 +143,7 @@ string linestyles = &quot;&quot;
 loop i=1..cols(mplot)
   linestyles += sprintf(&quot;set style line %d ps 0.02\n&quot;, $i)
 endloop
+set force_decpoint on
 plot mplot
   options with-lp time-series single-yaxis @ylog_scale_str
   printf &quot;@linestyles&quot;
@@ -147,6 +154,7 @@ plot mplot
   printf &quot;set ylabel '%s' font \&quot;, %d\&quot;&quot;, ylabel, fontsize
   printf &quot;set yrange[%g:%g]&quot;, min(mplot)*1.1, max(mplot)*1.1
 end plot --output=&quot;@filename&quot;
+set force_decpoint off
 </code>
 </gretl-function>
 <gretl-function name="fsreg_gui" type="bundle" pkg-role="gui-main">
@@ -166,10 +174,10 @@ end plot --output=&quot;@filename&quot;
   <param name="early_stopping_rounds" type="int" min="20" default="50">
 <description>Early stopping rounds</description>
   </param>
-  <param name="plot_coefficient_paths" type="bool" default="0" const="true">
+  <param name="plot_coefficient_paths" type="bool" default="0">
 <description>Plot coefficient paths</description>
   </param>
-  <param name="plot_rho_values" type="bool" default="0" const="true">
+  <param name="plot_rho_values" type="bool" default="0">
 <description>Plot correlation w. residuals</description>
   </param>
   <param name="verbose" type="int" min="0" max="2" default="1">
@@ -280,7 +288,7 @@ scalar self.actual_num_iterations = NA
 <code>/* Add post-estimation statistics to return bundle. */
 add_sd_of_uhat(&amp;self)
 add_first_order_residual_corr(&amp;self)
-compute_r_squares(&amp;self)
+get_insample_stats(&amp;self)
 </code>
 </gretl-function>
 <gretl-function name="add_sd_of_uhat" type="void" private="1">
@@ -328,27 +336,20 @@ series self.yhat = lincomb(X, self.coeff)
 series self.uhat = y - self.yhat
 </code>
 </gretl-function>
-<gretl-function name="compute_r_squares" type="void" private="1">
+<gretl-function name="get_insample_stats" type="void" private="1">
  <params count="1">
   <param name="self" type="bundleref"/>
  </params>
-<code>/* Wrapper calling functions for computing R^2.
-Function r2_stats() is taken from the &quot;ridge&quot; package.
-TODO: Currently, we only know that stuff is statistically applicable for statistics &quot;r2_qcorr&quot;. */
-scalar self.r2_qcorr = NA
+<code>/* Collect insample statistics of fit. */
+# from regls pkg.
+matrix stats = regls_get_stats(self.y, self.yhat)
+pos_mse = instrings(cnameget(stats), &quot;MSE&quot;)
+pos_r2 = instrings(cnameget(stats), &quot;R^2&quot;)
+self.r2 = stats[pos_r2]
+self.mse = stats[pos_mse]
+# from ridge pkg
 matrix r_squares = r2_stats(self.my, {self.yhat}, self.ncoeff)
 scalar self.r2_qcorr = r_squares[1]
-scalar self.r2 = get_rsquare(self)
-#scalar self.r2_qcorr_adj = r_squares[2]          # depends on self.ncoeff
-#scalar self.r2_scores = r_squares[3]
-</code>
-</gretl-function>
-<gretl-function name="get_rsquare" type="scalar" private="1">
- <params count="1">
-  <param name="self" type="bundle" const="true"/>
- </params>
-<code>/* Alternative computation of R-squared statistics. */
-return 1 - sum((self.y - self.yhat)^2) / sst(self.y)
 </code>
 </gretl-function>
 <gretl-function name="cleanup_bundle" type="void" private="1">
