@@ -85,19 +85,21 @@ function void test_get_max_correlation (void)
 
     # 1st draw
     set seed 1234
-    matrix yX = mnormal(100, 12)
+    matrix y = mnormal(100, 1)
+    matrix X = mnormal(100, 11)
     scalar pos = 0
 
-    scalar rho = get_max_correlation(yX, &pos)
+    scalar rho = get_max_correlation(y, X, &pos)
     assert(pos == 2)
     assert_almost_equal_num(rho, 0.15986581)
 
     # 2nd draw
     set seed 4321
-    matrix yX = mnormal(100, 12)
+    matrix y = mnormal(100, 1)
+    matrix X = mnormal(100, 11)
     scalar pos = 0
 
-    scalar rho = get_max_correlation(yX, &pos)
+    scalar rho = get_max_correlation(y, X, &pos)
     assert(pos == 11)
     assert_almost_equal_num(rho, 0.17891685)
 end function

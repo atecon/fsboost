@@ -296,16 +296,17 @@ function matrix get_nonzero_rescaled_coeffs (const bundle self)
 end function
 
 
-function scalar get_max_correlation (const matrix yX,
+function scalar get_max_correlation (const matrix residuals,
+                                     const matrix X "Features",
                                      scalar *position "j-th regressor")
     /* Compute correlations between "y" and all exogenous variables ("X").
      Return maximum of absolute correlations. */
 
-    scalar k = cols(yX) - 1
+    scalar k = cols(X)
     matrix correlations = mshape(NA, k, 1)
 
     loop i=1..k
-        correlations[i] = mcorr(yX[,1] ~ yX[,1+i])[1,2]
+        correlations[i] = mcorr(residuals ~ X[,i])[1,2]
     endloop
     scalar position = imaxc(abs(correlations))
 
@@ -359,7 +360,7 @@ end function
 function void fsreg_estimator (bundle *self)
     /* Actual implementation of the boosting-like forward stagewise algorithm. */
 
-    matrix yX = self.my ~ self.mX
+    matrix residuals = self.my # initialy 'residuals' equal endogenous
 
     scalar n_rounds_no_improvement = 0
     scalar rho_value_former = NA
@@ -370,13 +371,14 @@ function void fsreg_estimator (bundle *self)
         self.actual_num_iterations++
         scalar col = (i > 1) ? (i-1) : 1
 
-        self.rho_values[i] = get_max_correlation(yX, &position)
-        print_iteration_details(self, $i, self.rho_values[i])
+        self.rho_values[i] = get_max_correlation(residuals, self.mX, &position)
         delta = self.learning_rate * sgn(self.rho_values[i])
+
+        print_iteration_details(self, $i, self.rho_values[i])
 
         # update beta and residuals
         self.betas[i, position] = self.betas[i, position] + delta
-        yX[,1] = yX[,1] - delta * self.mX[, position]
+        residuals = residuals - delta * self.mX[, position]
 
         if i > 1    # early stopping
             check = early_stopping_applies(self, self.rho_values[i-1],\
