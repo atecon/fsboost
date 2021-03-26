@@ -1,6 +1,12 @@
 set verbose off
 clear
-include fsboost.gfn
+#include fsboost.gfn
+
+set workdir "/home/ninja/repo/fsboost"
+include "./src/fsboost.inp" --force
+include ridge.gfn --force
+include regls.gfn
+include string_utils.gfn
 
 scalar runEX = 1		# select an example
 

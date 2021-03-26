@@ -1,0 +1,74 @@
+set verbose off
+clear
+#include fsboost.gfn
+
+set workdir "/home/ninja/repo/fsboost"
+include "./src/fsboost.inp" --force
+include ridge.gfn --force
+include regls.gfn
+include string_utils.gfn
+
+EXAMPLE = 1
+
+if EXAMPLE == 1
+    open mccullagh.gdt
+
+    series LHS = Acc
+    list RHS = const TB TC TD TE T6569 T7074 T7579 O7579 Months
+
+    # Optional: set learning rate a bit higher
+    bundle opts = defbundle("learning_rate", 0.001)
+elif EXAMPLE == 2
+
+endif
+
+# Run standard poisson model
+if nelem(RHS) < $nobs
+    poisson Acc const TB TC TD TE T6569 T7074 T7579 O7579 Months
+endif
+
+
+# Run estimation
+bundle B = fspoisson(LHS, RHS, opts)
+print B
+print_fsboost_results(B)      # Print estimation results
+
+list X_final = B.X_final    # Retrieve list of selected regressors
+eval varnames(X_final)
+
+# Retrieve point estimates
+eval B.coeff            # retrieve point estimates of all variables
+eval B.coeff_nonzero    # retrieve point estimates of selected variables
+
+series yhat = B.yhat    # Retrieve fitted values
+
+stop
+
+# Plot realizations vs. fitted values
+#gnuplot LHS yhat --output="display"
+
+# Plot correlations as a function of iterations
+plot_rho_values(B)
+
+# Plot coefficient paths
+plot_coefficient_paths(B)
+
+# Prediction
+smpl 1 10
+matrix preds = fsboost_predict(RHS, B)
+print preds
+
+
+
+/* Activate if wished
+# Define own parameter set
+bundle opts = null
+scalar opts.verbose = 1
+scalar opts.learning_rate = 0.001                  # learning rate
+scalar opts.max_num_iterations = 5000   # max. number of boosting rounds
+scalar opts.early_stopping_rounds = 20  # stop if no improvement after n rounds
+
+# Run estimation
+bundle B = fsreg(LHS, RHS, opts)
+print_fsboost_results(B)      # Print estimation results
+*/

@@ -1,11 +1,13 @@
 set verbose off
 clear
 
-include assertion.gfn
 set assert stop
 
 include "./src/fsboost.inp" --force
-include ridge.gfn
+
+include assertion.gfn
+include ridge.gfn --force
+include regls.gfn
 include string_utils.gfn
 
 
@@ -201,3 +203,26 @@ end function
 test_fsboost_predict(L)
 
 
+open australia.gdt -q -p
+function void test_fsreg (const list L)
+    print "Start testing fsreg()"
+
+    # Given
+    series LHS = ldiff(L.PAU)
+    series IUS = L.IUS
+    series IAU = L.IAU
+    list RHS = const LHS(-1 to -2) IUS(-1 to -2)  IAU(-1 to -2)
+    bundle opts = defbundle("learning_rate", 0.025)
+    matrix expected = {0.020856, 0.15520, 0.25516, 0.00078387,\
+                      -0.00033219, 0.0018641, -0.0028965}'
+
+    # When
+    bundle B = fsreg(LHS, RHS, opts)
+    actual = B.coeff
+
+    # Then
+    loop i=1..rows(actual)
+        assert_almost_equal_num(actual[i] == expected[i], 10e-5)
+    endloop
+end function
+test_fsreg(dataset)

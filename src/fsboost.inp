@@ -91,7 +91,43 @@ function bundle fsreg (const series y "Dep. variable",
                        const list X "Candidates",
                        bundle opts[null])
 
-    /* Main function for forward-stagewise boosted regression. */
+    /* Main function for forward-stagewise boosted regression with quadratic loss. */
+
+    bundle opts = (exists(opts) == TRUE) ? opts : null
+    string opts.modeltype = "regression"
+
+    return fsboost(y, X, opts)
+end function
+
+function bundle fspoisson (const series y "Dep. variable",
+                           const list X "Candidates",
+                           bundle opts[null])
+
+    /* Main function for forward-stagewise boosted Poisson regression. */
+
+    bundle opts = (exists(opts) == TRUE) ? opts : null
+    string opts.modeltype = "poisson"
+
+    return fsboost(y, X, opts)
+end function
+
+function bundle fslogistic (const series y "Dep. variable",
+                            const list X "Candidates",
+                            bundle opts[null])
+
+    /* Main function for forward-stagewise boosted logistic regression. */
+
+    bundle opts = (exists(opts) == TRUE) ? opts : null
+    string opts.modeltype = "logistic"
+
+    return fsboost(y, X, opts)
+end function
+
+
+function bundle fsboost (const series y "Dep. variable",
+                         const list X "Candidates",
+                         const bundle opts)
+    /* Function doing actual stuff*/
 
     if $datatype != 2       # cross-sectional or panel
         smpl --no-missing y X
@@ -100,9 +136,7 @@ function bundle fsreg (const series y "Dep. variable",
     endif
 
     bundle self = default_fsreg_opts()
-    if exists(opts)
-        self = opts + self         # override defaults
-    endif
+    self = opts + self         # override defaults
 
     # Initilizations
     string self.yname = argname(y)
@@ -113,6 +147,8 @@ function bundle fsreg (const series y "Dep. variable",
     stdize_y_and_x(&self)
     fsreg_estimator(&self)
     post_process(&self)
+
+eval self.coeff # FIXME
 
     # Handle intercept: non-scaled as "coeff" is already re-scaled
     matrix resids = {y - lincomb(self.X_wo_constant, self.coeff)}
@@ -193,6 +229,7 @@ function void get_insample_stats (bundle *self)
     /* Collect insample statistics of fit. */
 
     # from regls pkg.
+    # TODO: add nobs
     matrix stats = regls_get_stats(self.y, self.yhat)
     pos_mse = instrings(cnameget(stats), "MSE")
     pos_r2 = instrings(cnameget(stats), "R^2")
@@ -204,32 +241,6 @@ function void get_insample_stats (bundle *self)
     scalar self.r2_qcorr = r_squares[1]
 end function
 
-
-/*
-function void get_insample_stats (bundle *self)
-    #Wrapper calling functions for computing R^2.
-    #Function r2_stats() is taken from the "ridge" package.
-    #TODO: Currently, we only know that stuff is statistically applicable for statistics "r2_qcorr".
-
-    scalar self.r2_qcorr = NA
-
-    matrix r_squares = r2_stats(self.my, {self.yhat}, self.ncoeff)
-    scalar self.r2_qcorr = r_squares[1]
-    scalar self.r2 = get_rsquare(self)
-    #scalar self.r2_qcorr_adj = r_squares[2]          # depends on self.ncoeff
-    #scalar self.r2_scores = r_squares[3]
-end function
-*/
-
-
-/*
-function scalar get_rsquare (const bundle self)
-    # Alternative computation of R-squared statistics.
-
-    return 1 - sum((self.y - self.yhat)^2) / sst(self.y)
-end function
-*/
-
 function void cleanup_bundle (bundle *self)
     /* Drop unnecessary stuff from bundle */
 
@@ -238,7 +249,6 @@ function void cleanup_bundle (bundle *self)
     delete self.mX
     delete self.y
     delete self.my
-    #delete self.ncoeff
     delete self.X_wo_constant
     delete self.resid_mean
 end function
@@ -373,12 +383,22 @@ function void fsreg_estimator (bundle *self)
 
         self.rho_values[i] = get_max_correlation(residuals, self.mX, &position)
         delta = self.learning_rate * sgn(self.rho_values[i])
+        # track 'current' beta -- we cumulate later to obtain the final betas
+        self.betas[i, position] = delta
 
         print_iteration_details(self, $i, self.rho_values[i])
 
-        # update beta and residuals
-        self.betas[i, position] = self.betas[i, position] + delta
-        residuals = residuals - delta * self.mX[, position]
+        # update residuals
+        matrix xb = delta * self.mX[, position] # equal to self.betas[i,position] * self.mX[, position]
+
+        if self.modeltype == "regression"
+            residuals -= xb
+        elif self.modeltype == "logistic"
+            residuals -= logistic(xb)
+        elif self.modeltype == "poisson"
+            residuals -= exp(xb)
+        endif
+
 
         if i > 1    # early stopping
             check = early_stopping_applies(self, self.rho_values[i-1],\
