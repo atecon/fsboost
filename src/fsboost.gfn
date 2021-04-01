@@ -90,11 +90,18 @@ endif
 scalar fontsize = 12
 string filename = (exists(filename)) ? filename : &quot;display&quot;
 matrix mplot = (absolute_values == TRUE) ? abs(self.rho_values) : self.rho_values
+clabels = defarray(&quot;Gradient&quot;)
+if instring(self.early_stopping_strategy, &quot;inner_product&quot;) &amp;&amp; absolute_values == TRUE
+  mplot ~= log(mplot)
+  clabels = clabels + defarray(&quot;Log(Gradient)&quot;)
+endif
+cnameset(mplot, clabels)
 set force_decpoint on
 plot mplot
   options with-lines time-series
   literal set linetype 1 lc rgb &quot;black&quot; lw 1
-  literal set nokey
+  literal set linetype 2 lc rgb &quot;black&quot; dt 2 lw 1
+  literal set key
   literal set grid
   printf &quot;set title \&quot;%s\&quot; font \&quot;, %d\&quot;&quot;, title, fontsize
   printf &quot;set xlabel 'Iterations' font \&quot;, %d\&quot;&quot;, fontsize
