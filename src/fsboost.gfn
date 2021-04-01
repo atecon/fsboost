@@ -80,8 +80,13 @@ modprint bhat label_str extra
   <param name="absolute_values" type="bool" default="1"/>
  </params>
 <code>/* Plot correlation coefficients. */
-string title = &quot;Forward stagewise correlation values&quot;
-string ylabel = (absolute_values == FALSE) ? &quot;Correlations w. residuals&quot; : &quot;Absolute correlations w. residuals&quot;
+string type = (instring(self.early_stopping_strategy, &quot;inner_product&quot;)) ? &quot;inner product&quot; : &quot;correlation&quot;
+string title = sprintf(&quot;Forward stagewise %s values&quot;, type)
+if instring(self.early_stopping_strategy, &quot;inner_product&quot;)
+  string ylabel = (absolute_values == FALSE) ? &quot;Inner product of residuals&quot; : &quot;Absolute inner product of residuals&quot;
+else
+  string ylabel = (absolute_values == FALSE) ? &quot;Correlations w. residuals&quot; : &quot;Absolute correlations w. residuals&quot;
+endif
 scalar fontsize = 12
 string filename = (exists(filename)) ? filename : &quot;display&quot;
 matrix mplot = (absolute_values == TRUE) ? abs(self.rho_values) : self.rho_values

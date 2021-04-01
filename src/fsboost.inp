@@ -486,9 +486,16 @@ function void plot_rho_values (bundle self,
                                string filename[null] "Path + filename to store figure",
                                bool absolute_values[1])
     /* Plot correlation coefficients. */
-
-    string title = "Forward stagewise correlation values"
-    string ylabel = (absolute_values == FALSE) ? "Correlations w. residuals" : "Absolute correlations w. residuals"
+    string type = (instring(self.early_stopping_strategy, "inner_product")) ? \
+                    "inner product" : "correlation"
+    string title = sprintf("Forward stagewise %s values", type)
+    if instring(self.early_stopping_strategy, "inner_product")
+        string ylabel = (absolute_values == FALSE) ? "Inner product of residuals" : \
+                        "Absolute inner product of residuals"
+    else
+        string ylabel = (absolute_values == FALSE) ? "Correlations w. residuals" : \
+                        "Absolute correlations w. residuals"
+    endif
     scalar fontsize = 12
     string filename = (exists(filename)) ? filename : "display"
     matrix mplot = (absolute_values == TRUE) ? abs(self.rho_values) : self.rho_values
