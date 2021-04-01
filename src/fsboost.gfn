@@ -19,43 +19,15 @@ ridge string_utils regls </depends>
   <param name="y" type="series" const="true">
 <description>Dep. variable</description>
   </param>
-  <param name="X" type="list" const="true">
+  <param name="X" type="list">
 <description>Candidates</description>
   </param>
   <param name="opts" type="bundle" optional="true"/>
  </params>
-<code>/* Main function for forward-stagewise boosted regression. */
-if $datatype != 2       # cross-sectional or panel
-  smpl --no-missing y X
-else                    # time-series case
-  smpl --contiguous y X
-endif
-bundle self = default_fsreg_opts()
-if exists(opts)
-  self = opts + self         # override defaults
-endif
-# Initilizations
-string self.yname = argname(y)
-strings self.Xnames = varnames(X)
-initialize(&amp;self, y, X)
-add_early_stopping_threshold(&amp;self)
-stdize_y_and_x(&amp;self)
-fsreg_estimator(&amp;self)
-post_process(&amp;self)
-# Handle intercept: non-scaled as &quot;coeff&quot; is already re-scaled
-matrix resids = {y - lincomb(self.X_wo_constant, self.coeff)}
-if self.with_constant
-  scalar self.resid_mean = meanc(resids)
-  self.coeff = self.resid_mean | self.coeff
-endif
-matrix self.coeff_nonzero = get_nonzero_rescaled_coeffs(self)
-attach_coefficient_row_labels(&amp;self)
-scalar self.ncoeff = rows(vec(self.coeff_nonzero))
-add_yhat_and_uhat_to_bundle(y, X, &amp;self)
-post_estimation_statistics(&amp;self)
-list self.X_final = add_selected_predictors_to_list(X, self)
-cleanup_bundle(&amp;self)
-return self
+<code>/* Main function for forward-stagewise boosted regression with quadratic loss. */
+bundle opts = (exists(opts) != FALSE) ? opts : null
+string opts.modeltype = &quot;regression&quot;
+return fsboost(y, X, opts)
 </code>
 </gretl-function>
 <gretl-function name="print_fsboost_results" type="void">
@@ -72,8 +44,13 @@ if self.with_constant
   label_str += defarray(&quot;const&quot;)
 endif
 label_str += get_names_of_nonzero_coeffs(self)
-label_str += defarray( &quot;Learning rate&quot;, &quot;Number of iterations&quot;, &quot;Correl. w. residuals&quot;, &quot;S.E. of regression&quot; )
-matrix extra = self.learning_rate | self.actual_num_iterations |self.rho_values[self.actual_num_iterations] | sd(self.uhat)
+label_str += defarray( &quot;Number of obs.&quot;, &quot;Learning rate&quot;, &quot;Number of iterations&quot;, &quot;S.E. of regression&quot; )
+if instring(self.early_stopping_strategy, &quot;inner_product&quot;)
+  label_str += &quot;Remaining inner product&quot;
+else
+  label_str += &quot;Correl. w. residuals&quot;
+endif
+matrix extra = self.N | self.learning_rate | self.actual_num_iterations | sd(self.uhat) | self.rho_values[self.actual_num_iterations]
 if ok(self.r2)
   matrix extra |= self.r2
   label_str += defarray(&quot;R-squared&quot;)
@@ -162,10 +139,10 @@ set force_decpoint off
   <param name="y" type="series" const="true">
 <description>Dep. variable</description>
   </param>
-  <param name="X" type="list" const="true">
+  <param name="X" type="list">
 <description>Candidates</description>
   </param>
-  <param name="learning_rate" type="scalar" min="0.0001" max="0.9999" default="0.025" const="true">
+  <param name="learning_rate" type="scalar" min="0.0001" max="0.9999" default="0.025">
 <description>Learning rate</description>
   </param>
   <param name="max_num_iterations" type="int" min="100" default="10000">
@@ -205,7 +182,7 @@ return model
 </gretl-function>
 <gretl-function name="fsboost_predict" type="matrix">
  <params count="2">
-  <param name="L" type="list" const="true">
+  <param name="L" type="list">
 <description>List of regressors</description>
   </param>
   <param name="self" type="bundle" const="true"/>
@@ -229,7 +206,7 @@ return lincomb(X, bhat)
 <code>/* Set default values */
 bundle self = null
 scalar self.verbose = 1
-string self.early_stopping_strategy = &quot;residual_corr_abs&quot;
+string self.early_stopping_strategy = &quot;inner_product_rel&quot; #&quot;residual_corr_abs&quot;
 add_early_stopping_threshold(&amp;self)
 scalar self.learning_rate = 0.01
 scalar self.max_num_iterations = 10000
@@ -241,13 +218,20 @@ return self
  <params count="1">
   <param name="self" type="bundleref"/>
  </params>
-<code>/* Add threshold for early stopping depending on early stopping type. */
+<code>/* Add threshold for early stopping depending on early stopping type.
+The higher the threshold, the less iterations are computed. */
 if self.early_stopping_strategy == &quot;residual_corr_abs&quot;
   # Abs. correlation has to improve at minimum by x units.
   scalar self.early_stopping_threshold = 0.01
 elif self.early_stopping_strategy == &quot;residual_corr_rel&quot;
   # Abs. correlation has to improve at minimum relatively by x.
   scalar self.early_stopping_threshold = 0.05
+elif self.early_stopping_strategy == &quot;inner_product_abs&quot;
+  # Abs. inner product has to improve at minimum relatively by x.
+  scalar self.early_stopping_threshold = 5.0
+elif self.early_stopping_strategy == &quot;inner_product_rel&quot;
+  # Abs. inner product has to improve at minimum relatively by x.
+  scalar self.early_stopping_threshold = 0.035
 endif
 </code>
 </gretl-function>
@@ -266,7 +250,7 @@ matrix self.Xsd = sdc({self.X_wo_constant})
  <params count="3">
   <param name="self" type="bundleref"/>
   <param name="y" type="series" const="true"/>
-  <param name="X" type="list" const="true"/>
+  <param name="X" type="list"/>
  </params>
 <code>/* Some initalizations. */
 scalar self.T = $nobs
@@ -279,6 +263,80 @@ scalar self.resid_mean = 0
 matrix self.rho_values = mshape(NA, self.max_num_iterations, 1)
 matrix self.betas = zeros(self.max_num_iterations, nelem(self.X_wo_constant))
 scalar self.actual_num_iterations = NA
+</code>
+</gretl-function>
+<gretl-function name="fspoisson" type="bundle" private="1">
+ <params count="3">
+  <param name="y" type="series" const="true">
+<description>Dep. variable</description>
+  </param>
+  <param name="X" type="list">
+<description>Candidates</description>
+  </param>
+  <param name="opts" type="bundle" optional="true"/>
+ </params>
+<code>/* Main function for forward-stagewise boosted Poisson regression. */
+bundle opts = (exists(opts) != FALSE) ? opts : null
+string opts.modeltype = &quot;poisson&quot;
+return fsboost(y, X, opts)
+</code>
+</gretl-function>
+<gretl-function name="fslogistic" type="bundle" private="1">
+ <params count="3">
+  <param name="y" type="series" const="true">
+<description>Dep. variable</description>
+  </param>
+  <param name="X" type="list">
+<description>Candidates</description>
+  </param>
+  <param name="opts" type="bundle" optional="true"/>
+ </params>
+<code>/* Main function for forward-stagewise boosted logistic regression. */
+bundle opts = (exists(opts) != FALSE) ? opts : null
+string opts.modeltype = &quot;logistic&quot;
+return fsboost(y, X, opts)
+</code>
+</gretl-function>
+<gretl-function name="fsboost" type="bundle" private="1">
+ <params count="3">
+  <param name="y" type="series" const="true">
+<description>Dep. variable</description>
+  </param>
+  <param name="X" type="list">
+<description>Candidates</description>
+  </param>
+  <param name="opts" type="bundle" const="true"/>
+ </params>
+<code>/* Function doing actual stuff*/
+if $datatype != 2       # cross-sectional or panel
+  smpl --no-missing y X
+else                    # time-series case
+  smpl --contiguous y X
+endif
+bundle self = default_fsreg_opts()
+self = opts + self         # override defaults
+# Initilizations
+string self.yname = argname(y) # TODO: check that this still works
+strings self.Xnames = varnames(X)
+initialize(&amp;self, y, X)
+add_early_stopping_threshold(&amp;self)
+stdize_y_and_x(&amp;self)
+fsreg_estimator(&amp;self)
+post_process(&amp;self)
+# Handle intercept: non-scaled as &quot;coeff&quot; is already re-scaled
+matrix resids = {y - lincomb(self.X_wo_constant, self.coeff)}
+if self.with_constant
+  scalar self.resid_mean = meanc(resids)
+  self.coeff = self.resid_mean | self.coeff
+endif
+matrix self.coeff_nonzero = get_nonzero_rescaled_coeffs(self)
+attach_coefficient_row_labels(&amp;self)
+scalar self.ncoeff = rows(vec(self.coeff_nonzero))
+add_yhat_and_uhat_to_bundle(y, X, &amp;self)
+post_estimation_statistics(&amp;self)
+list self.X_final = add_selected_predictors_to_list(X, self)
+cleanup_bundle(&amp;self)
+return self
 </code>
 </gretl-function>
 <gretl-function name="post_estimation_statistics" type="void" private="1">
@@ -313,7 +371,7 @@ endif
 </gretl-function>
 <gretl-function name="add_selected_predictors_to_list" type="list" private="1">
  <params count="2">
-  <param name="X" type="list" const="true"/>
+  <param name="X" type="list"/>
   <param name="self" type="bundle" const="true"/>
  </params>
 <code>/* Add active set of predictors to list. */
@@ -328,7 +386,7 @@ return L
 <gretl-function name="add_yhat_and_uhat_to_bundle" type="void" private="1">
  <params count="3">
   <param name="y" type="series" const="true"/>
-  <param name="X" type="list" const="true"/>
+  <param name="X" type="list"/>
   <param name="self" type="bundleref"/>
  </params>
 <code>/* Add final fitted values and residuals to bundle. */
@@ -347,6 +405,7 @@ pos_mse = instrings(cnameget(stats), &quot;MSE&quot;)
 pos_r2 = instrings(cnameget(stats), &quot;R^2&quot;)
 self.r2 = stats[pos_r2]
 self.mse = stats[pos_mse]
+self.N = $nobs
 # from ridge pkg
 matrix r_squares = r2_stats(self.my, {self.yhat}, self.ncoeff)
 scalar self.r2_qcorr = r_squares[1]
@@ -362,7 +421,6 @@ delete self.ysd
 delete self.mX
 delete self.y
 delete self.my
-#delete self.ncoeff
 delete self.X_wo_constant
 delete self.resid_mean
 </code>
@@ -425,18 +483,21 @@ return selifr(self.coeff, mask)
 </code>
 </gretl-function>
 <gretl-function name="get_max_correlation" type="scalar" private="1">
- <params count="2">
-  <param name="yX" type="matrix" const="true"/>
+ <params count="3">
+  <param name="residuals" type="matrix" const="true"/>
+  <param name="X" type="matrix" const="true">
+<description>Features</description>
+  </param>
   <param name="position" type="scalarref">
 <description>j-th regressor</description>
   </param>
  </params>
 <code>/* Compute correlations between &quot;y&quot; and all exogenous variables (&quot;X&quot;).
 Return maximum of absolute correlations. */
-scalar k = cols(yX) - 1
+scalar k = cols(X)
 matrix correlations = mshape(NA, k, 1)
 loop i=1..k
-  correlations[i] = mcorr(yX[,1] ~ yX[,1+i])[1,2]
+  correlations[i] = mcorr(residuals ~ X[,i])[1,2]
 endloop
 scalar position = imaxc(abs(correlations))
 return correlations[position]
@@ -456,7 +517,7 @@ endif
  <params count="3">
   <param name="self" type="bundle" const="true"/>
   <param name="iteration" type="int"/>
-  <param name="rho" type="scalar" const="true">
+  <param name="rho" type="scalar">
 <description>Correlation coeff.</description>
   </param>
  </params>
@@ -469,14 +530,14 @@ endif
 <gretl-function name="early_stopping_applies" type="scalar" private="1">
  <params count="3">
   <param name="self" type="bundle" const="true"/>
-  <param name="score_former" type="scalar" const="true"/>
-  <param name="score_current" type="scalar" const="true"/>
+  <param name="score_former" type="scalar"/>
+  <param name="score_current" type="scalar"/>
  </params>
 <code>/* Decision whether the early stopping criteria is met, or not.
 return: If the criteria is met, return TRUE, otherwise FALSE. */
-if self.early_stopping_strategy == &quot;residual_corr_abs&quot;
+if self.early_stopping_strategy == &quot;residual_corr_abs&quot; || self.early_stopping_strategy == &quot;inner_product_abs&quot;
   scalar delta = abs(score_former) - abs(score_current)
-elif self.early_stopping_strategy == &quot;residual_corr_rel&quot;
+elif self.early_stopping_strategy == &quot;residual_corr_rel&quot; || self.early_stopping_strategy == &quot;inner_product_rel&quot;
   scalar delta = ( abs(score_former) - abs(score_current) ) / abs(score_former)
 endif
 if delta &lt; 0    # correlation increased
@@ -486,12 +547,29 @@ else
 endif
 </code>
 </gretl-function>
+<gretl-function name="get_max_innerproduct" type="scalar" private="1">
+ <params count="3">
+  <param name="residuals" type="matrix" const="true"/>
+  <param name="X" type="matrix" const="true">
+<description>Features</description>
+  </param>
+  <param name="position" type="scalarref">
+<description>j-th regressor</description>
+  </param>
+ </params>
+<code>/* Compute inner product between &quot;residuals&quot; and all exogenous variables (&quot;X&quot;).
+Return maximum of absolute inner product. */
+ip = vec(residuals'X)
+scalar position = imaxc(abs(ip))
+return ip[position]
+</code>
+</gretl-function>
 <gretl-function name="fsreg_estimator" type="void" private="1">
  <params count="1">
   <param name="self" type="bundleref"/>
  </params>
 <code>/* Actual implementation of the boosting-like forward stagewise algorithm. */
-matrix yX = self.my ~ self.mX
+matrix residuals = self.my # initialy 'residuals' equal endogenous
 scalar n_rounds_no_improvement = 0
 scalar rho_value_former = NA
 scalar self.actual_num_iterations = 0
@@ -499,12 +577,24 @@ loop i=1..self.max_num_iterations
   scalar position = NA
   self.actual_num_iterations++
   scalar col = (i &gt; 1) ? (i-1) : 1
-  self.rho_values[i] = get_max_correlation(yX, &amp;position)
-  print_iteration_details(self, $i, self.rho_values[i])
+  if self.early_stopping_strategy == &quot;inner_product_abs&quot; || self.early_stopping_strategy == &quot;inner_product_rel&quot;
+    self.rho_values[i] = get_max_innerproduct(residuals, self.mX, &amp;position)
+  else
+    self.rho_values[i] = get_max_correlation(residuals, self.mX, &amp;position)
+  endif
   delta = self.learning_rate * sgn(self.rho_values[i])
-  # update beta and residuals
-  self.betas[i, position] = self.betas[i, position] + delta
-  yX[,1] = yX[,1] - delta * self.mX[, position]
+  # track 'current' beta -- we cumulate later to obtain the final betas
+  self.betas[i, position] = delta
+  print_iteration_details(self, $i, self.rho_values[i])
+  # update residuals
+  matrix xb = delta * self.mX[, position] # equal to self.betas[i,position] * self.mX[, position]
+  if self.modeltype == &quot;regression&quot;
+    residuals -= xb
+  elif self.modeltype == &quot;logistic&quot;
+    residuals -= logistic(xb)
+  elif self.modeltype == &quot;poisson&quot;
+    residuals -= exp(xb)
+  endif
   if i &gt; 1    # early stopping
     check = early_stopping_applies(self, self.rho_values[i-1], self.rho_values[i])
     if check == TRUE
@@ -541,9 +631,21 @@ return selected_vars
 <sample-script>
 set verbose off
 clear
-include fsboost.gfn
+set seed 12345
+#include fsboost.gfn
 
-scalar runEX = 1		# select an example
+set workdir &quot;/home/ninja/repo/fsboost&quot;
+USE_INP = FALSE
+if USE_INP
+    include &quot;./src/fsboost.inp&quot; --force
+    include ridge.gfn --force
+    include regls.gfn
+    include string_utils.gfn
+else
+    include &quot;./src/fsboost.gfn&quot;
+endif
+
+scalar runEX = 4		# select an example
 
 # Select an example
 if runEX == 1
@@ -554,7 +656,7 @@ if runEX == 1
     list RHS = const LHS(-1 to -2) IUS(-1 to -2)  IAU(-1 to -2)
 
     # Optional: set learning rate a bit higher
-    bundle opts = defbundle(&quot;learning_rate&quot;, 0.025)
+    bundle opts = defbundle(&quot;learning_rate&quot;, 0.01)
 
 elif runEX == 2
     # SIMULATION
@@ -571,7 +673,9 @@ elif runEX == 2
         RHS += genseries(sprintf(&quot;S%d&quot;, $i), X[,i])
     endloop
 
-    bundle opts = null
+    bundle opts
+    #bundle opts = defbundle(&quot;learning_rate&quot;, 0.01,\
+    #                        &quot;early_stopping_strategy&quot;, &quot;residual_corr_rel&quot;)
 
 elif runEX == 3
     open mroz87.gdt -q -p     # cross-sectional data set
@@ -581,7 +685,8 @@ elif runEX == 3
     RHS -= LHS WW     # drop lhs variable
 
     # Set a low learning rate
-    bundle opts = defbundle(&quot;learning_rate&quot;, 0.025)
+    bundle opts
+    #bundle opts = defbundle(&quot;learning_rate&quot;, 0.025)
 
 elif runEX == 4             # example taken from Allin's regls pckg.
 
@@ -591,14 +696,17 @@ elif runEX == 4             # example taken from Allin's regls pckg.
     # at picking out the relevant ones. Note that no seed is set, so
     # results will differ somewhat from run to run.
 
-    n = 80  # observations
+    n = 800  # observations
     k = 120 # regressors
-    matrix X = mnormal(n,k)
-    u = mnormal(n, 1)
     matrix sel = {5, 20, 37, 60, 70}
-    matrix y = sumr(X[,sel]) + u
+    matrix X = mnormal(n, k)
+    matrix beta = muniform(n, 1)[sel]
+    u = mnormal(n, 1)
+
+    matrix y = sumr(X[,sel] * beta) + u
     printf &quot;Truly non-zero coefficients:\n&quot;
     eval sel
+    print beta
 
     nulldata n --preserve
     series LHS = y
@@ -608,19 +716,24 @@ elif runEX == 4             # example taken from Allin's regls pckg.
     endloop
 
     # Set a low learning rate and low early stopping threshold
-    bundle opts = defbundle(&quot;early_stopping_strategy&quot;, &quot;residual_corr_rel&quot;)
+    bundle opts = defbundle(&quot;early_stopping_strategy&quot;, &quot;residual_corr_rel&quot;,\
+                    &quot;learning_rate&quot;, 0.015)
 endif
+
 
 # Run standard OLS as benchmark
 if nelem(RHS) &lt; $nobs
-    ols LHS RHS
+    #ols LHS RHS
 endif
 
 
 # Run estimation
+set stopwatch
 bundle B = fsreg(LHS, RHS, opts)
+printf &quot;\nTook %g sec.\n&quot;, $stopwatch
 #print B
 print_fsboost_results(B)      # Print estimation results
+stop
 
 list X_final = B.X_final    # Retrieve list of selected regressors
 eval varnames(X_final)

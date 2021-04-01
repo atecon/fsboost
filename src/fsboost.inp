@@ -234,12 +234,12 @@ function void get_insample_stats (bundle *self)
     /* Collect insample statistics of fit. */
 
     # from regls pkg.
-    # TODO: add nobs
     matrix stats = regls_get_stats(self.y, self.yhat)
     pos_mse = instrings(cnameget(stats), "MSE")
     pos_r2 = instrings(cnameget(stats), "R^2")
     self.r2 = stats[pos_r2]
     self.mse = stats[pos_mse]
+    self.N = $nobs
 
     # from ridge pkg
     matrix r_squares = r2_stats(self.my, {self.yhat}, self.ncoeff)
@@ -346,7 +346,8 @@ function void print_iteration_details (const bundle self,
     /* */
 
     if self.verbose == 2
-        printf "\nInfo: Iteration %d out of %d: correlation coeff. = %g.\n", iteration, self.max_num_iterations, rho
+        printf "\nInfo: Iteration %d out of %d: correlation coeff. = %g.\n",\
+            iteration, self.max_num_iterations, rho
     endif
 end function
 
@@ -540,13 +541,18 @@ function void print_fsboost_results (bundle self)
     endif
     label_str += get_names_of_nonzero_coeffs(self)
     label_str += defarray(\
+                            "Number of obs.",\
                             "Learning rate",\
                             "Number of iterations",\
-                            "Correl. w. residuals",\
                             "S.E. of regression"\
                         )
-
-    matrix extra = self.learning_rate | self.actual_num_iterations |self.rho_values[self.actual_num_iterations] | sd(self.uhat)
+    if instring(self.early_stopping_strategy, "inner_product")
+        label_str += "Remaining inner product"
+    else
+        label_str += "Correl. w. residuals"
+    endif
+    matrix extra = self.N | self.learning_rate | self.actual_num_iterations |\
+        sd(self.uhat) | self.rho_values[self.actual_num_iterations]
 
     if ok(self.r2)
       matrix extra |= self.r2
