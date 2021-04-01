@@ -426,8 +426,10 @@ function void fsreg_estimator (bundle *self)
             residuals -= exp(xb)
         endif
 
-        if i > 1    # early stopping
-            check = early_stopping_applies(self, self.rho_values[i-1],\
+        if i > 2    # early stopping
+            /* As the 'rho_values converge cyclically at the end, let's compare every
+            second iteration and check for improvement of the gradient. */
+            check = early_stopping_applies(self, self.rho_values[i-2],\
                                             self.rho_values[i])
             if check == TRUE
                 n_rounds_no_improvement++
