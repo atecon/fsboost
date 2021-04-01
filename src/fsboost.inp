@@ -3,7 +3,7 @@ function bundle default_fsreg_opts (void)
 
     bundle self = null
     scalar self.verbose = 1
-    string self.early_stopping_strategy = "residual_corr_abs"
+    string self.early_stopping_strategy = "inner_product_rel" #"residual_corr_abs"
     add_early_stopping_threshold(&self)
     scalar self.learning_rate = 0.01
     scalar self.max_num_iterations = 10000
@@ -14,7 +14,8 @@ end function
 
 
 function void add_early_stopping_threshold (bundle *self)
-    /* Add threshold for early stopping depending on early stopping type. */
+    /* Add threshold for early stopping depending on early stopping type.
+    The higher the threshold, the less iterations are computed. */
 
     if self.early_stopping_strategy == "residual_corr_abs"
         # Abs. correlation has to improve at minimum by x units.
@@ -22,6 +23,12 @@ function void add_early_stopping_threshold (bundle *self)
     elif self.early_stopping_strategy == "residual_corr_rel"
         # Abs. correlation has to improve at minimum relatively by x.
         scalar self.early_stopping_threshold = 0.05
+    elif self.early_stopping_strategy == "inner_product_abs"
+        # Abs. inner product has to improve at minimum relatively by x.
+        scalar self.early_stopping_threshold = 5.0
+    elif self.early_stopping_strategy == "inner_product_rel"
+        # Abs. inner product has to improve at minimum relatively by x.
+        scalar self.early_stopping_threshold = 0.035
     endif
 end function
 
@@ -93,7 +100,7 @@ function bundle fsreg (const series y "Dep. variable",
 
     /* Main function for forward-stagewise boosted regression with quadratic loss. */
 
-    bundle opts = (exists(opts) == TRUE) ? opts : null
+    bundle opts = (exists(opts) != FALSE) ? opts : null
     string opts.modeltype = "regression"
 
     return fsboost(y, X, opts)
@@ -105,7 +112,7 @@ function bundle fspoisson (const series y "Dep. variable",
 
     /* Main function for forward-stagewise boosted Poisson regression. */
 
-    bundle opts = (exists(opts) == TRUE) ? opts : null
+    bundle opts = (exists(opts) != FALSE) ? opts : null
     string opts.modeltype = "poisson"
 
     return fsboost(y, X, opts)
@@ -117,7 +124,7 @@ function bundle fslogistic (const series y "Dep. variable",
 
     /* Main function for forward-stagewise boosted logistic regression. */
 
-    bundle opts = (exists(opts) == TRUE) ? opts : null
+    bundle opts = (exists(opts) != FALSE) ? opts : null
     string opts.modeltype = "logistic"
 
     return fsboost(y, X, opts)
@@ -139,7 +146,7 @@ function bundle fsboost (const series y "Dep. variable",
     self = opts + self         # override defaults
 
     # Initilizations
-    string self.yname = argname(y)
+    string self.yname = argname(y) # TODO: check that this still works
     strings self.Xnames = varnames(X)
     initialize(&self, y, X)
     add_early_stopping_threshold(&self)
@@ -147,8 +154,6 @@ function bundle fsboost (const series y "Dep. variable",
     stdize_y_and_x(&self)
     fsreg_estimator(&self)
     post_process(&self)
-
-eval self.coeff # FIXME
 
     # Handle intercept: non-scaled as "coeff" is already re-scaled
     matrix resids = {y - lincomb(self.X_wo_constant, self.coeff)}
@@ -352,9 +357,12 @@ function scalar early_stopping_applies (const bundle self,
     /* Decision whether the early stopping criteria is met, or not.
      return: If the criteria is met, return TRUE, otherwise FALSE. */
 
-    if self.early_stopping_strategy == "residual_corr_abs"
+    if self.early_stopping_strategy == "residual_corr_abs" || \
+        self.early_stopping_strategy == "inner_product_abs"
         scalar delta = abs(score_former) - abs(score_current)
-    elif self.early_stopping_strategy == "residual_corr_rel"
+
+    elif self.early_stopping_strategy == "residual_corr_rel" || \
+        self.early_stopping_strategy == "inner_product_rel"
         scalar delta = ( abs(score_former) - abs(score_current) ) / \
                         abs(score_former)
     endif
@@ -364,6 +372,19 @@ function scalar early_stopping_applies (const bundle self,
     else
         return (delta >= self.early_stopping_threshold) ? FALSE : TRUE
     endif
+end function
+
+
+function scalar get_max_innerproduct (const matrix residuals,
+                                      const matrix X "Features",
+                                      scalar *position "j-th regressor")
+    /* Compute inner product between "residuals" and all exogenous variables ("X").
+     Return maximum of absolute inner product. */
+
+    ip = vec(residuals'X)
+    scalar position = imaxc(abs(ip))
+
+    return ip[position]
 end function
 
 
@@ -381,7 +402,12 @@ function void fsreg_estimator (bundle *self)
         self.actual_num_iterations++
         scalar col = (i > 1) ? (i-1) : 1
 
-        self.rho_values[i] = get_max_correlation(residuals, self.mX, &position)
+        if self.early_stopping_strategy == "inner_product_abs" || \
+            self.early_stopping_strategy == "inner_product_rel"
+            self.rho_values[i] = get_max_innerproduct(residuals, self.mX, &position)
+        else
+            self.rho_values[i] = get_max_correlation(residuals, self.mX, &position)
+        endif
         delta = self.learning_rate * sgn(self.rho_values[i])
         # track 'current' beta -- we cumulate later to obtain the final betas
         self.betas[i, position] = delta
@@ -398,7 +424,6 @@ function void fsreg_estimator (bundle *self)
         elif self.modeltype == "poisson"
             residuals -= exp(xb)
         endif
-
 
         if i > 1    # early stopping
             check = early_stopping_applies(self, self.rho_values[i-1],\

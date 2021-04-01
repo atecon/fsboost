@@ -1,14 +1,20 @@
 set verbose off
 clear
+set seed 12345
 #include fsboost.gfn
 
 set workdir "/home/ninja/repo/fsboost"
-include "./src/fsboost.inp" --force
-include ridge.gfn --force
-include regls.gfn
-include string_utils.gfn
+USE_INP = FALSE
+if USE_INP
+    include "./src/fsboost.inp" --force
+    include ridge.gfn --force
+    include regls.gfn
+    include string_utils.gfn
+else
+    include "./src/fsboost.gfn"
+endif
 
-scalar runEX = 1		# select an example
+scalar runEX = 4		# select an example
 
 # Select an example
 if runEX == 1
@@ -19,7 +25,7 @@ if runEX == 1
     list RHS = const LHS(-1 to -2) IUS(-1 to -2)  IAU(-1 to -2)
 
     # Optional: set learning rate a bit higher
-    bundle opts = defbundle("learning_rate", 0.025)
+    bundle opts = defbundle("learning_rate", 0.01)
 
 elif runEX == 2
     # SIMULATION
@@ -36,7 +42,9 @@ elif runEX == 2
         RHS += genseries(sprintf("S%d", $i), X[,i])
     endloop
 
-    bundle opts = null
+    bundle opts
+    #bundle opts = defbundle("learning_rate", 0.01,\
+    #                        "early_stopping_strategy", "residual_corr_rel")
 
 elif runEX == 3
     open mroz87.gdt -q -p     # cross-sectional data set
@@ -46,7 +54,8 @@ elif runEX == 3
     RHS -= LHS WW     # drop lhs variable
 
     # Set a low learning rate
-    bundle opts = defbundle("learning_rate", 0.025)
+    bundle opts
+    #bundle opts = defbundle("learning_rate", 0.025)
 
 elif runEX == 4             # example taken from Allin's regls pckg.
 
@@ -56,14 +65,17 @@ elif runEX == 4             # example taken from Allin's regls pckg.
     # at picking out the relevant ones. Note that no seed is set, so
     # results will differ somewhat from run to run.
 
-    n = 80  # observations
+    n = 800  # observations
     k = 120 # regressors
-    matrix X = mnormal(n,k)
-    u = mnormal(n, 1)
     matrix sel = {5, 20, 37, 60, 70}
-    matrix y = sumr(X[,sel]) + u
+    matrix X = mnormal(n, k)
+    matrix beta = muniform(n, 1)[sel]
+    u = mnormal(n, 1)
+
+    matrix y = sumr(X[,sel] * beta) + u
     printf "Truly non-zero coefficients:\n"
     eval sel
+    print beta
 
     nulldata n --preserve
     series LHS = y
@@ -73,19 +85,24 @@ elif runEX == 4             # example taken from Allin's regls pckg.
     endloop
 
     # Set a low learning rate and low early stopping threshold
-    bundle opts = defbundle("early_stopping_strategy", "residual_corr_rel")
+    bundle opts = defbundle("early_stopping_strategy", "residual_corr_rel",\
+                    "learning_rate", 0.015)
 endif
+
 
 # Run standard OLS as benchmark
 if nelem(RHS) < $nobs
-    ols LHS RHS
+    #ols LHS RHS
 endif
 
 
 # Run estimation
+set stopwatch
 bundle B = fsreg(LHS, RHS, opts)
+printf "\nTook %g sec.\n", $stopwatch
 #print B
 print_fsboost_results(B)      # Print estimation results
+stop
 
 list X_final = B.X_final    # Retrieve list of selected regressors
 eval varnames(X_final)
