@@ -716,8 +716,8 @@ elif runEX == 4             # example taken from Allin's regls pckg.
     endloop
 
     # Set a low learning rate and low early stopping threshold
-    bundle opts = defbundle(&quot;early_stopping_strategy&quot;, &quot;residual_corr_rel&quot;,\
-                    &quot;learning_rate&quot;, 0.015)
+    bundle opts #= defbundle(&quot;early_stopping_strategy&quot;, &quot;residual_corr_rel&quot;,\
+                #    &quot;learning_rate&quot;, 0.015)
 endif
 
 
