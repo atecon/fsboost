@@ -608,10 +608,59 @@ function matrix fsboost_predict (const list L "List of regressors",
   X += L
 
   if nelem(X) != rows(bhat)
-    printf "\nError: Length of list L does not match originally passed list.\n"
+    printf "\nError: Length of list 'L' does not match originally passed list.\n"
     return pred
   endif
 
   return lincomb(X, bhat)
 end function
 
+function matrix fsboost_dynpredict (const matrix Xtrain,
+                                    const matrix Xtest,
+                                    const bundle self)
+  /* Compute dynamic recursive predictions using point estimates. 'y' refers to the vector of realizatons of the endogenous. "L" must comprise the same regressors in the same order as originally passed to fsreg(). */
+
+  matrix pred = {NA}
+  matrix bhat = vec(self.coeff)
+
+  scalar max_horizon = $nobs  # length of current dataset defines length of testset
+  max_horizon = ($datatype == 3) ? (max_horizon / $pd) : max_horizon
+  printf "\nInfo: '%d' periods to forecast.\n", max_horizon
+
+  /*
+  if nelem(X) != rows(bhat)
+    printf "\nError: Length of list L does not match originally passed list.\n"
+    return pred
+  endif
+  */
+
+  # Lags of the endogenous start with <NAME_> where NAME refers to the name
+  # of the endogenous.
+  matrix positions_endogenous = instrings(L, sprintf("%s_", self.yname))
+  if !nelem(positions_endogenous)
+    print "Warning: No lags of the endogenous found. Dynamic forecast not applicable."
+    return pred
+  endif
+  scalar max_lag = nelem(positions_endogenous)
+
+  matrix Z = Xtrain[-max_lag,] | Xtest
+  matrix X = Z
+
+  ** HIER WEITERMACHEN
+
+  scalar init = 1 + max_lag
+  scalar last = init + max_horizon - 1
+  loop i=init..last
+    # replace missing future values by its lags
+    loop j=1..max_lag
+        scalar p = positions_endogenous[j]
+        X[i, p] = X[i, (p-1)]
+    endloop
+    pred[i-max_lag] = X[i,] * bhat' # TODO: do transposing outside loop
+    eval pred[i-max_lag]
+
+    # Replace
+  endloop
+
+  return
+end function

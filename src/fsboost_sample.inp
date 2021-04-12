@@ -14,7 +14,7 @@ else
     include "./src/fsboost.gfn"
 endif
 
-scalar runEX = 4		# select an example
+scalar runEX = 1		# select an example
 
 # Select an example
 if runEX == 1
@@ -100,7 +100,7 @@ endif
 set stopwatch
 bundle B = fsreg(LHS, RHS, opts)
 printf "\nTook %g sec.\n", $stopwatch
-#print B
+print B
 print_fsboost_results(B)      # Print estimation results
 stop
 
