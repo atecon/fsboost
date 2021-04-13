@@ -646,7 +646,7 @@ function matrix fsboost_dynpredict (const matrix Xtrain,
   matrix Z = Xtrain[-max_lag,] | Xtest
   matrix X = Z
 
-  ** HIER WEITERMACHEN
+  #** HIER WEITERMACHEN
 
   scalar init = 1 + max_lag
   scalar last = init + max_horizon - 1
