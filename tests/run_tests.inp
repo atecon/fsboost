@@ -15,13 +15,13 @@ function void test_default_fsreg_opts (void)
     print "Start testing default_fsreg_opts()"
 
     bundle B = default_fsreg_opts()
-
+print B
     assert(B.verbose == 1)
     assert(B.learning_rate == 0.01)
     assert(B.max_num_iterations == 10000)
     assert(B.early_stopping_rounds == 50)
-    assert(B.early_stopping_threshold == 0.01)
-    assert(B.early_stopping_strategy == "residual_corr_abs")
+    assert(B.early_stopping_threshold == 0.035)
+    assert(B.early_stopping_strategy == "inner_product_rel")
 end function
 test_default_fsreg_opts()
 
