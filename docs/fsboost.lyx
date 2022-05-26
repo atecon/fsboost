@@ -116,7 +116,7 @@ literal "false"
 \end_layout
 
 \begin_layout Date
-Version 0.2
+Version 0.3
 \end_layout
 
 \begin_layout Standard
@@ -145,6 +145,23 @@ status open
 Changelog
 \end_layout
 
+\begin_layout Itemize
+
+\size footnotesize
+Version 0.3 (May, 2022)
+\end_layout
+
+\begin_deeper
+\begin_layout Itemize
+
+\size footnotesize
+Bugfix: Final set of features was not correctly identified when calling
+ the function 
+\family typewriter
+plot_coefficient_paths()
+\end_layout
+
+\end_deeper
 \begin_layout Itemize
 
 \size footnotesize

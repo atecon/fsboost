@@ -44,9 +44,11 @@ function void initialize (bundle *self, const series y, const list X)
     list self.X_wo_constant = X - const
     scalar self.with_constant = nelem(self.X_wo_constant) < nelem(X) ? \
                                 TRUE : FALSE
-    strings self.Xnames_wo_constant = (self.with_constant == TRUE) ? \
-                                        strdrop(self.Xnames, "const") : \
-                                        self.Xnames
+    if self.with_constant == TRUE
+        strings self.Xnames_wo_constant = strdrop(self.Xnames, "const")
+    else
+        strings self.Xnames_wo_constant = self.Xnames
+    endif
 
     # Initializations of variables for estimator function
     scalar self.resid_mean = 0
@@ -162,7 +164,6 @@ function void add_first_order_residual_corr (bundle *self)
     scalar self.uhat_first_order_corr = mcorr(muhat)[1,2]
   endif
 end function
-
 
 
 function list add_selected_predictors_to_list (const list X, const bundle self)
@@ -406,11 +407,8 @@ function void plot_coefficient_paths (bundle self,
     scalar fontsize = 12
     string filename = (exists(filename)) ? filename : "display"
     string ylog_scale_str = (ylog_scale == TRUE) ? "--ylogscale=10" : ""
-
-    # Only consider active set variables
-    matrix mask = sumc(self.betas)
-    mplot = selifc(self.betas, mask)
-    cnameset(mplot, varnames(self.X_final))
+    strings names_X_final = strdrop(varnames(self.X_final), "const")
+    matrix mplot = get_columns_by_name(self.betas, names_X_final)
 
     string linestyles = ""
     loop i=1..cols(mplot)
@@ -429,6 +427,33 @@ function void plot_coefficient_paths (bundle self,
         printf "set yrange[%g:%g]", min(mplot)*1.1, max(mplot)*1.1
     end plot --output="@filename"
     set force_decpoint off
+end function
+
+
+function matrix get_columns_by_name (const matrix m,
+                                     const strings select)
+    /* Retrieve columns of 'm' as identified by 'select'. If 'm' has no column labels or 'select' is empty, return empty matrix.
+    return: matrix*/
+
+    matrix ret
+    strings labels_matrix = cnameget(m)
+    if !nelem(labels_matrix) || !nelem(select)
+        print "WARNING: No columns selected."
+        return ret
+    endif
+
+    loop foreach i select
+        scalar pos = instrings(labels_matrix, "$i")
+        if pos
+            ret ~= m[,pos]
+        endif
+    endloop
+
+    if cols(ret)
+        cnameset(ret, select)
+    endif
+
+    return ret
 end function
 
 
@@ -458,14 +483,13 @@ end function
 
 
 function strings get_names_of_nonzero_coeffs (const bundle self)
-    /* Retrieve names variables for which point estimates are non-zero. */
+    /* Retrieve names variables for which point estimates are non-zero for optimal number of iterations. */
 
     matrix bhat_all = vec(self.betas[self.actual_num_iterations,])
-
     scalar n_nonzero_vars = sum(bhat_all .!= 0)
     strings selected_vars = array(n_nonzero_vars)
-
     scalar counter = 1
+
     loop i = 1..rows(bhat_all)
         if bhat_all[i] != 0
             selected_vars[counter] = self.Xnames_wo_constant[i]
