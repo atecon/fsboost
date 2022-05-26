@@ -2,8 +2,8 @@
 <gretl-functions>
 <gretl-function-package name="fsboost" minver="2020e" lives-in-subdir="true">
 <author email="atecon@posteo.de">Artur Tarassow</author>
-<version>0.2</version>
-<date>2021-03-22</date>
+<version>0.3</version>
+<date>2022-05-26</date>
 <description>Forward-stagewise boosted regression estimates</description>
 <tags>C13 C52</tags>
 <label>Forward Stagewise</label>
