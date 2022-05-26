@@ -135,10 +135,8 @@ string ylabel = (ylog_scale == FALSE) ? &quot;Standardized coefficients&quot; : 
 scalar fontsize = 12
 string filename = (exists(filename)) ? filename : &quot;display&quot;
 string ylog_scale_str = (ylog_scale == TRUE) ? &quot;--ylogscale=10&quot; : &quot;&quot;
-# Only consider active set variables
-matrix mask = sumc(self.betas)
-mplot = selifc(self.betas, mask)
-cnameset(mplot, varnames(self.X_final))
+strings names_X_final = strdrop(varnames(self.X_final), &quot;const&quot;)
+matrix mplot = get_columns_by_name(self.betas, names_X_final)
 string linestyles = &quot;&quot;
 loop i=1..cols(mplot)
   linestyles += sprintf(&quot;set style line %d ps 0.02\n&quot;, $i)
@@ -273,7 +271,11 @@ scalar self.T = $nobs
 series self.y = y
 list self.X_wo_constant = X - const
 scalar self.with_constant = nelem(self.X_wo_constant) &lt; nelem(X) ? TRUE : FALSE
-strings self.Xnames_wo_constant = (self.with_constant == TRUE) ? strdrop(self.Xnames, &quot;const&quot;) : self.Xnames
+if self.with_constant == TRUE
+  strings self.Xnames_wo_constant = strdrop(self.Xnames, &quot;const&quot;)
+else
+  strings self.Xnames_wo_constant = self.Xnames
+endif
 # Initializations of variables for estimator function
 scalar self.resid_mean = 0
 matrix self.rho_values = mshape(NA, self.max_num_iterations, 1)
@@ -520,11 +522,36 @@ loop i=1..self.max_num_iterations
 endloop
 </code>
 </gretl-function>
+<gretl-function name="get_columns_by_name" type="matrix" private="1">
+ <params count="2">
+  <param name="m" type="matrix" const="true"/>
+  <param name="select" type="strings" const="true"/>
+ </params>
+<code>/* Retrieve columns of 'm' as identified by 'select'. If 'm' has no column labels or 'select' is empty, return empty matrix.
+return: matrix*/
+matrix ret
+strings labels_matrix = cnameget(m)
+if !nelem(labels_matrix) || !nelem(select)
+  print &quot;WARNING: No columns selected.&quot;
+  return ret
+endif
+loop foreach i select
+  scalar pos = instrings(labels_matrix, &quot;$i&quot;)
+  if pos
+    ret ~= m[,pos]
+  endif
+endloop
+if cols(ret)
+  cnameset(ret, select)
+endif
+return ret
+</code>
+</gretl-function>
 <gretl-function name="get_names_of_nonzero_coeffs" type="strings" private="1">
  <params count="1">
   <param name="self" type="bundle" const="true"/>
  </params>
-<code>/* Retrieve names variables for which point estimates are non-zero. */
+<code>/* Retrieve names variables for which point estimates are non-zero for optimal number of iterations. */
 matrix bhat_all = vec(self.betas[self.actual_num_iterations,])
 scalar n_nonzero_vars = sum(bhat_all .!= 0)
 strings selected_vars = array(n_nonzero_vars)
