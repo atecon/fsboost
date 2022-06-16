@@ -199,3 +199,31 @@ end function
 test_fsboost_predict(L)
 
 
+
+bundles Params = null
+Params = Params + _(y_true = vec({3, -0.5, 2, 7}),\
+                    y_pred = vec({2.5, 0.0, 2, 8}),\
+                    expected = 0.948)
+Params = Params + _(y_true = vec({1, 2, 3}),\
+                    y_pred = vec({1, 2, 3}),\
+                    expected = 1.0)
+Params = Params + _(y_true = vec({1, 2, 3}),\
+                    y_pred = vec({2, 2, 2}),\
+                    expected = 0.0)
+Params = Params + _(y_true = vec({1, 2, 3}),\
+                    y_pred = vec({3, 2, 1}),\
+                    expected = -3.0)
+
+
+function void test_r2_score (const bundles P)
+    print "Start testing function r2_score()."
+
+    loop foreach i P
+        # Given + When
+        scalar actual = r2_score(P[i].y_true, P[i].y_pred)
+
+        # Then
+        assert_almost_equal_num(actual, P[i].expected, 10e-3)
+    endloop
+end function
+test_r2_score(Params)

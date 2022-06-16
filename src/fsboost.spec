@@ -1,7 +1,7 @@
 author = Artur Tarassow
 email = atecon@posteo.de
 version = 0.3
-date = 2022-05-26
+date = 2022-06-15
 description = Forward-stagewise boosted regression estimates
 tags = C13 C52
 min-version = 2020e
@@ -11,5 +11,4 @@ label = Forward Stagewise
 menu-attachment = MAINWIN/Model/LinearModels
 help = fsboost.pdf
 sample-script = fsboost_sample.inp
-depends = string_utils ridge regls
-provider = ridge
+depends = string_utils regls

@@ -569,3 +569,98 @@ function matrix fsboost_predict (const list L "List of regressors",
   return lincomb(X, bhat)
 end function
 
+
+
+function matrix r2_stats (matrix y_true "T by 1 vector of realizations",
+                          matrix y_pred "T by 1 vector of estimated values",
+                          scalar num_parameters "No. of parameters")
+    /* Helper function for computing different R-square statistics. */
+
+    matrix y_true = vec(y_true)
+    matrix y_pred = vec(y_pred)
+
+    if rows(y_true) != rows(y_pred)
+        printf "\nError: Vectors y_true and y_pred are of different length.\n"
+        return NA
+    endif
+    if rows(y_pred) < 2
+        printf "\nError: R^2 score not well-defined with less than two samples.\n"
+        return NA
+    endif
+    if isconst(y_true)
+        printf "\nError: Vector y_true is constant.\n"
+        return NA
+    endif
+
+    matrix R = NA * zeros(3,1)
+    R[1] = r2_qcorr(&y_true, &y_pred)
+    R[2] = r2_qcorr_adjusted(R[1], rows(y_true), num_parameters)
+    R[3] = r2_score(y_true, y_pred)
+    rnameset(R, "r2_qcorr r2_qcorr_adj r2_score")
+
+    return R
+end function
+
+
+function scalar r2_qcorr (const matrix *y_true,
+                          const matrix *y_pred)
+    /* R-square based on quadratic correlation. */
+    return corr(y_true, y_pred)^2
+end function
+
+
+function scalar r2_qcorr_adjusted (scalar r2 "R-square from r2_qcorr()",
+      int n "Sample length",
+      scalar num_parameters "No. of ridge parameters used")
+    /* Adjusted R-square based on quadratic correlation */
+
+    nominator = n - 1
+    denominator = n - num_parameters - 1
+
+    return 1 - (1-r2) * nominator/denominator
+end function
+
+
+function scalar r2_score (const matrix y_true,
+                          const matrix y_pred "Must incl. an intercept if present")
+    /* R^2 (coefficient of determination) regression score function.
+       Best possible score is 1.0 and it can be negative (because the
+       model can be arbitrarily worse). A constant model that always
+       predicts the expected value of y, disregarding the input features,
+       would get a R^2 score of 0.0.
+
+       Notes
+       -----
+       This is not a symmetric function.
+       Unlike most other scores, R^2 score may be negative (it need not
+       actually be the square of a quantity R).
+       This metric is not well-defined for single samples and will return
+       a NaN value if n_samples is less than two.
+       References
+       ----------
+       <https://github.com/scikit-learn/scikit-learn/blob/
+       1495f69242646d239d89a5713982946b8ffcf9d9/
+       sklearn/metrics/regression.py#L449>
+
+       `Wikipedia entry on the Coefficient of determination
+       <https://en.wikipedia.org/wiki/Coefficient_of_determination>`
+    */
+
+    # Initialize check values
+    nonzero_denominator = 0
+    nonzero_numerator = 0
+    valid_score = 0
+
+    # Compute statistics
+    scalar numerator = sumc( (y_true-y_pred).^2)
+    scalar denominator = sumc( (y_true-mean(y_true)).^2 )
+
+    nonzero_denominator = (denominator != 0) ? 1 : nonzero_denominator
+    nonzero_numerator = (numerator!=0) ? 1 : nonzero_numerator
+
+    valid_score = (nonzero_denominator && nonzero_numerator) ? 1 : valid_score
+
+    output_scores = 1
+
+    return (valid_score) ? (1 - numerator/denominator) : output_scores
+end function

@@ -148,7 +148,7 @@ Changelog
 \begin_layout Itemize
 
 \size footnotesize
-Version 0.3 (May, 2022)
+Version 0.3 (June, 2022)
 \end_layout
 
 \begin_deeper
@@ -159,6 +159,20 @@ Bugfix: Final set of features was not correctly identified when calling
  the function 
 \family typewriter
 plot_coefficient_paths()
+\end_layout
+
+\begin_layout Itemize
+
+\size footnotesize
+Internal changes: Remove dependency on 
+\begin_inset Quotes eld
+\end_inset
+
+ridge
+\begin_inset Quotes erd
+\end_inset
+
+ package for computing statistics of fit
 \end_layout
 
 \end_deeper

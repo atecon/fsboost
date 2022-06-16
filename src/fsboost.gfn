@@ -3,7 +3,7 @@
 <gretl-function-package name="fsboost" minver="2020e" lives-in-subdir="true">
 <author email="atecon@posteo.de">Artur Tarassow</author>
 <version>0.3</version>
-<date>2022-05-26</date>
+<date>2022-06-15</date>
 <description>Forward-stagewise boosted regression estimates</description>
 <tags>C13 C52</tags>
 <label>Forward Stagewise</label>
@@ -11,9 +11,8 @@
 <help>
 pdfdoc:fsboost.pdf
 </help>
-<depends count="3">
-ridge string_utils regls </depends>
-<provider>ridge</provider>
+<depends count="2">
+string_utils regls </depends>
 <gretl-function name="fsreg" type="bundle">
  <params count="3">
   <param name="y" type="series" const="true">
@@ -563,6 +562,108 @@ loop i = 1..rows(bhat_all)
   endif
 endloop
 return selected_vars
+</code>
+</gretl-function>
+<gretl-function name="r2_stats" type="matrix" private="1">
+ <params count="3">
+  <param name="y_true" type="matrix">
+<description>T by 1 vector of realizations</description>
+  </param>
+  <param name="y_pred" type="matrix">
+<description>T by 1 vector of estimated values</description>
+  </param>
+  <param name="num_parameters" type="scalar">
+<description>No. of parameters</description>
+  </param>
+ </params>
+<code>/* Helper function for computing different R-square statistics. */
+matrix y_true = vec(y_true)
+matrix y_pred = vec(y_pred)
+if rows(y_true) != rows(y_pred)
+  printf &quot;\nError: Vectors y_true and y_pred are of different length.\n&quot;
+  return NA
+endif
+if rows(y_pred) &lt; 2
+  printf &quot;\nError: R^2 score not well-defined with less than two samples.\n&quot;
+  return NA
+endif
+if isconst(y_true)
+  printf &quot;\nError: Vector y_true is constant.\n&quot;
+  return NA
+endif
+matrix R = NA * zeros(3,1)
+R[1] = r2_qcorr(&amp;y_true, &amp;y_pred)
+R[2] = r2_qcorr_adjusted(R[1], rows(y_true), num_parameters)
+R[3] = r2_score(y_true, y_pred)
+rnameset(R, &quot;r2_qcorr r2_qcorr_adj r2_score&quot;)
+return R
+</code>
+</gretl-function>
+<gretl-function name="r2_qcorr" type="scalar" private="1">
+ <params count="2">
+  <param name="y_true" type="matrixref" const="true"/>
+  <param name="y_pred" type="matrixref" const="true"/>
+ </params>
+<code>/* R-square based on quadratic correlation. */
+return corr(y_true, y_pred)^2
+</code>
+</gretl-function>
+<gretl-function name="r2_qcorr_adjusted" type="scalar" private="1">
+ <params count="3">
+  <param name="r2" type="scalar">
+<description>R-square from r2_qcorr()</description>
+  </param>
+  <param name="n" type="int">
+<description>Sample length</description>
+  </param>
+  <param name="num_parameters" type="scalar">
+<description>No. of ridge parameters used</description>
+  </param>
+ </params>
+<code>/* Adjusted R-square based on quadratic correlation */
+nominator = n - 1
+denominator = n - num_parameters - 1
+return 1 - (1-r2) * nominator/denominator
+</code>
+</gretl-function>
+<gretl-function name="r2_score" type="scalar" private="1">
+ <params count="2">
+  <param name="y_true" type="matrix" const="true"/>
+  <param name="y_pred" type="matrix" const="true">
+<description>Must incl. an intercept if present</description>
+  </param>
+ </params>
+<code>/* R^2 (coefficient of determination) regression score function.
+Best possible score is 1.0 and it can be negative (because the
+model can be arbitrarily worse). A constant model that always
+predicts the expected value of y, disregarding the input features, would get a R^2 score of 0.0.
+Notes
+-----
+This is not a symmetric function.
+Unlike most other scores, R^2 score may be negative (it need not
+actually be the square of a quantity R).
+This metric is not well-defined for single samples and will return
+a NaN value if n_samples is less than two.
+References
+----------
+&lt;https://github.com/scikit-learn/scikit-learn/blob/
+1495f69242646d239d89a5713982946b8ffcf9d9/
+sklearn/metrics/regression.py#L449&gt;
+`Wikipedia entry on the Coefficient of determination
+&lt;https://en.wikipedia.org/wiki/Coefficient_of_determination&gt;`
+*/
+# Initialize check values
+nonzero_denominator = 0
+nonzero_numerator = 0
+valid_score = 0
+# Compute statistics
+scalar numerator = sumc( (y_true-y_pred).^2)
+scalar denominator = sumc( (y_true-mean(y_true)).^2 )
+nonzero_denominator = (denominator != 0) ? 1 : nonzero_denominator
+nonzero_numerator = (numerator!=0) ? 1 : nonzero_numerator
+valid_score = (nonzero_denominator &amp;&amp; nonzero_numerator) ? 1 : valid_score
+output_scores = 1
+return (valid_score) ? (1 - numerator/denominator) : output_scores
 </code>
 </gretl-function>
 <sample-script>
