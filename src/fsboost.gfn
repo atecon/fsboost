@@ -2,8 +2,8 @@
 <gretl-functions>
 <gretl-function-package name="fsboost" minver="2020e" lives-in-subdir="true">
 <author email="atecon@posteo.de">Artur Tarassow</author>
-<version>0.3</version>
-<date>2022-06-15</date>
+<version>0.4</version>
+<date>2023-03-12</date>
 <description>Forward-stagewise boosted regression estimates</description>
 <tags>C13 C52</tags>
 <label>Forward Stagewise</label>
@@ -66,31 +66,30 @@ printf &quot;\n-------------------------------------------------------\n&quot;
 printf &quot;Forward-stagewise regression results (no inference)\n&quot;
 printf &quot;Early stopping strategy: '%s' (c = %g)&quot;, self.early_stopping_strategy, self.early_stopping_threshold
 printf &quot;\n-------------------------------------------------------&quot;
-strings label_str = array(0)
-if self.with_constant
-  label_str += defarray(&quot;const&quot;)
-endif
-label_str += get_names_of_nonzero_coeffs(self)
-label_str += defarray( &quot;Learning rate&quot;, &quot;Number of iterations&quot;, &quot;Correl. w. residuals&quot;, &quot;S.E. of regression&quot; )
-matrix extra = self.learning_rate | self.actual_num_iterations |self.rho_values[self.actual_num_iterations] | sd(self.uhat)
+bundle Stats = null
+Stats += defbundle(&quot;Learning rate&quot;, self.learning_rate)
+Stats += defbundle(&quot;Number of iterations&quot;, self.actual_num_iterations)
+Stats += defbundle(&quot;Correl. w. residuals&quot;, self.rho_values[self.actual_num_iterations])
+Stats += defbundle(&quot;S.E. of regression&quot;, sd(self.uhat))
 if ok(self.r2)
-  matrix extra |= self.r2
-  label_str += defarray(&quot;R-squared&quot;)
+  Stats += defbundle(&quot;R-squared&quot;, self.r2)
 endif
 if ok(self.r2_qcorr)
-  matrix extra |= self.r2_qcorr
-  label_str += defarray(&quot;R-squared alt.&quot;)
+  Stats += defbundle(&quot;R-squared alt.&quot;, self.r2_qcorr)
 endif
 if ok(self.mse)
-  matrix extra |= self.mse
-  label_str += defarray(&quot;MSE&quot;)
+  Stats += defbundle(&quot;MSE&quot;, self.mse)
 endif
 if inbundle(self, &quot;uhat_first_order_corr&quot;)
-  matrix extra |= self.uhat_first_order_corr
-  label_str += defarray(&quot;rho&quot;)
+  Stats += defbundle(&quot;rho&quot;, self.uhat_first_order_corr)
 endif
-matrix bhat = self.coeff_nonzero ~ NA
-modprint bhat label_str extra
+printf &quot;\n%12.4f&quot;, self.coeff_nonzero
+printf &quot;-------------------------------------------------------\n&quot;
+loop foreach i Stats
+  scalar precision = &quot;$i&quot; == &quot;Number of iterations&quot; ? 0 : 4
+  printf &quot;%s = %.*f\n&quot;, &quot;$i&quot;, precision, Stats[&quot;$i&quot;]
+endloop
+printf &quot;======================================================\n\n&quot;
 </code>
 </gretl-function>
 <gretl-function name="plot_rho_values" type="void">
@@ -348,7 +347,6 @@ pos_mse = instrings(cnameget(stats), &quot;MSE&quot;)
 pos_r2 = instrings(cnameget(stats), &quot;R^2&quot;)
 self.r2 = stats[pos_r2]
 self.mse = stats[pos_mse]
-# from ridge pkg
 matrix r_squares = r2_stats(self.my, {self.yhat}, self.ncoeff)
 scalar self.r2_qcorr = r_squares[1]
 </code>

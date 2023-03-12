@@ -200,7 +200,6 @@ function void get_insample_stats (bundle *self)
     self.r2 = stats[pos_r2]
     self.mse = stats[pos_mse]
 
-    # from ridge pkg
     matrix r_squares = r2_stats(self.my, {self.yhat}, self.ncoeff)
     scalar self.r2_qcorr = r_squares[1]
 end function
@@ -510,41 +509,32 @@ function void print_fsboost_results (bundle self)
             self.early_stopping_strategy, self.early_stopping_threshold
     printf "\n-------------------------------------------------------"
 
-    strings label_str = array(0)
-
-    if self.with_constant
-      label_str += defarray("const")
-    endif
-    label_str += get_names_of_nonzero_coeffs(self)
-    label_str += defarray(\
-                            "Learning rate",\
-                            "Number of iterations",\
-                            "Correl. w. residuals",\
-                            "S.E. of regression"\
-                        )
-
-    matrix extra = self.learning_rate | self.actual_num_iterations |self.rho_values[self.actual_num_iterations] | sd(self.uhat)
-
+    bundle Stats = null
+    Stats += defbundle("Learning rate", self.learning_rate)
+    Stats += defbundle("Number of iterations", self.actual_num_iterations)
+    Stats += defbundle("Correl. w. residuals",
+                       self.rho_values[self.actual_num_iterations])
+    Stats += defbundle("S.E. of regression", sd(self.uhat))
     if ok(self.r2)
-      matrix extra |= self.r2
-      label_str += defarray("R-squared")
+      Stats += defbundle("R-squared", self.r2)
     endif
     if ok(self.r2_qcorr)
-      matrix extra |= self.r2_qcorr
-      label_str += defarray("R-squared alt.")
+      Stats += defbundle("R-squared alt.", self.r2_qcorr)
     endif
     if ok(self.mse)
-      matrix extra |= self.mse
-      label_str += defarray("MSE")
+      Stats += defbundle("MSE", self.mse)
     endif
     if inbundle(self, "uhat_first_order_corr")
-      matrix extra |= self.uhat_first_order_corr
-      label_str += defarray("rho")
+      Stats += defbundle("rho", self.uhat_first_order_corr)
     endif
 
-    matrix bhat = self.coeff_nonzero ~ NA
-
-    modprint bhat label_str extra
+    printf "\n%12.4f", self.coeff_nonzero
+    printf "-------------------------------------------------------\n"
+    loop foreach i Stats
+        scalar precision = "$i" == "Number of iterations" ? 0 : 4
+        printf "%s = %.*f\n", "$i", precision, Stats["$i"]
+    endloop
+    printf "======================================================\n\n"
 end function
 
 

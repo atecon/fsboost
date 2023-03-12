@@ -5,7 +5,7 @@ include assertion.gfn
 set assert stop
 
 include "./src/fsboost.inp" --force
-include ridge.gfn
+include regls.gfn
 include string_utils.gfn
 
 
