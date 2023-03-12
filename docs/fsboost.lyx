@@ -116,7 +116,7 @@ literal "false"
 \end_layout
 
 \begin_layout Date
-Version 0.3
+Version 0.4
 \end_layout
 
 \begin_layout Standard
@@ -145,6 +145,21 @@ status open
 Changelog
 \end_layout
 
+\begin_layout Itemize
+
+\size footnotesize
+Version 0.4 (March, 2023)
+\end_layout
+
+\begin_deeper
+\begin_layout Itemize
+
+\family typewriter
+\size footnotesize
+Improve printing of coefficient estimates
+\end_layout
+
+\end_deeper
 \begin_layout Itemize
 
 \size footnotesize
