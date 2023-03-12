@@ -20,6 +20,6 @@ tarball : clean
 	tar -cvzf ../$(PKG).zip *
 
 clean:
-	rm -rf $(GFN) $(PKG).zip
+	rm -rf $(PKG).zip # $(GFN)
 	rm -rf session.inp
 	rm -rf ./$(PKG).pdf
