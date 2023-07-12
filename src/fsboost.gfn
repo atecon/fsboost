@@ -2,8 +2,8 @@
 <gretl-functions>
 <gretl-function-package name="fsboost" minver="2020e" lives-in-subdir="true">
 <author email="atecon@posteo.de">Artur Tarassow</author>
-<version>0.4</version>
-<date>2023-03-12</date>
+<version>0.5</version>
+<date>2023-07-12</date>
 <description>Forward-stagewise boosted regression estimates</description>
 <tags>C13 C52</tags>
 <label>Forward Stagewise</label>
@@ -24,23 +24,28 @@ string_utils regls </depends>
   <param name="opts" type="bundle" optional="true"/>
  </params>
 <code>/* Main function for forward-stagewise boosted regression. */
+
 if $datatype != 2       # cross-sectional or panel
   smpl --no-missing y X
 else                    # time-series case
   smpl --contiguous y X
 endif
+
 bundle self = default_fsreg_opts()
 if exists(opts)
   self = opts + self         # override defaults
 endif
+
 # Initilizations
 string self.yname = argname(y)
 strings self.Xnames = varnames(X)
 initialize(&amp;self, y, X)
 add_early_stopping_threshold(&amp;self)
+
 stdize_y_and_x(&amp;self)
 fsreg_estimator(&amp;self)
 post_process(&amp;self)
+
 # Handle intercept: non-scaled as &quot;coeff&quot; is already re-scaled
 matrix resids = {y - lincomb(self.X_wo_constant, self.coeff)}
 if self.with_constant
@@ -48,12 +53,19 @@ if self.with_constant
   self.coeff = self.resid_mean | self.coeff
 endif
 matrix self.coeff_nonzero = get_nonzero_rescaled_coeffs(self)
+
 attach_coefficient_row_labels(&amp;self)
+
 scalar self.ncoeff = rows(vec(self.coeff_nonzero))
+
 add_yhat_and_uhat_to_bundle(y, X, &amp;self)
+
 post_estimation_statistics(&amp;self)
+
 list self.X_final = add_selected_predictors_to_list(X, self)
+
 cleanup_bundle(&amp;self)
+
 return self
 </code>
 </gretl-function>
@@ -62,10 +74,12 @@ return self
   <param name="self" type="bundle"/>
  </params>
 <code>/* Print results. */
+
 printf &quot;\n-------------------------------------------------------\n&quot;
 printf &quot;Forward-stagewise regression results (no inference)\n&quot;
 printf &quot;Early stopping strategy: '%s' (c = %g)&quot;, self.early_stopping_strategy, self.early_stopping_threshold
 printf &quot;\n-------------------------------------------------------&quot;
+
 bundle Stats = null
 Stats += defbundle(&quot;Learning rate&quot;, self.learning_rate)
 Stats += defbundle(&quot;Number of iterations&quot;, self.actual_num_iterations)
@@ -83,6 +97,7 @@ endif
 if inbundle(self, &quot;uhat_first_order_corr&quot;)
   Stats += defbundle(&quot;rho&quot;, self.uhat_first_order_corr)
 endif
+
 printf &quot;\n%12.4f&quot;, self.coeff_nonzero
 printf &quot;-------------------------------------------------------\n&quot;
 loop foreach i Stats
@@ -101,11 +116,13 @@ printf &quot;======================================================\n\n&quot;
   <param name="absolute_values" type="bool" default="1"/>
  </params>
 <code>/* Plot correlation coefficients. */
+
 string title = &quot;Forward stagewise correlation values&quot;
 string ylabel = (absolute_values == FALSE) ? &quot;Correlations w. residuals&quot; : &quot;Absolute correlations w. residuals&quot;
 scalar fontsize = 12
 string filename = (exists(filename)) ? filename : &quot;display&quot;
 matrix mplot = (absolute_values == TRUE) ? abs(self.rho_values) : self.rho_values
+
 set force_decpoint on
 plot mplot
   options with-lines time-series
@@ -128,6 +145,7 @@ set force_decpoint off
   <param name="ylog_scale" type="bool" default="0"/>
  </params>
 <code>/* Plot coefficient paths. */
+
 string title = &quot;Forward stagewise coefficient paths&quot;
 string ylabel = (ylog_scale == FALSE) ? &quot;Standardized coefficients&quot; : &quot;Standardized coefficients (in logarithms)&quot;
 scalar fontsize = 12
@@ -135,10 +153,12 @@ string filename = (exists(filename)) ? filename : &quot;display&quot;
 string ylog_scale_str = (ylog_scale == TRUE) ? &quot;--ylogscale=10&quot; : &quot;&quot;
 strings names_X_final = strdrop(varnames(self.X_final), &quot;const&quot;)
 matrix mplot = get_columns_by_name(self.betas, names_X_final)
+
 string linestyles = &quot;&quot;
 loop i=1..cols(mplot)
   linestyles += sprintf(&quot;set style line %d ps 0.02\n&quot;, $i)
 endloop
+
 set force_decpoint on
 plot mplot
   options with-lp time-series single-yaxis @ylog_scale_str
@@ -183,19 +203,24 @@ set force_decpoint off
   </param>
  </params>
 <code>/* GUI wrapper for fsreg(). */
+
 bundle model = null
 scalar model.verbose = verbose
 scalar model.learning_rate = learning_rate
 scalar model.max_num_iterations = max_num_iterations
 scalar model.early_stopping_rounds = early_stopping_rounds
+
 bundle model = fsreg(y, X, model)
 print_fsboost_results(model)
+
 if plot_rho_values == TRUE
   plot_rho_values(model)
 endif
+
 if plot_coefficient_paths == TRUE
   plot_coefficient_paths(model)
 endif
+
 return model
 </code>
 </gretl-function>
@@ -207,22 +232,27 @@ return model
   <param name="self" type="bundle" const="true"/>
  </params>
 <code>/* Compute predictions using point estimates. List &quot;L&quot; must comprise the same regressors in the same order as originally passed to fsreg(). */
+
 matrix pred = {NA}
 list X = null
 matrix bhat = vec(self.coeff)
+
 if self.with_constant == TRUE &amp;&amp; inlist(L, &quot;const&quot;) == FALSE
   X += const
 endif
 X += L
+
 if nelem(X) != rows(bhat)
   printf &quot;\nError: Length of list L does not match originally passed list.\n&quot;
   return pred
 endif
+
 return lincomb(X, bhat)
 </code>
 </gretl-function>
 <gretl-function name="default_fsreg_opts" type="bundle" private="1">
 <code>/* Set default values */
+
 bundle self = null
 scalar self.verbose = 1
 string self.early_stopping_strategy = &quot;residual_corr_abs&quot;
@@ -230,6 +260,7 @@ add_early_stopping_threshold(&amp;self)
 scalar self.learning_rate = 0.01
 scalar self.max_num_iterations = 10000
 scalar self.early_stopping_rounds = 50
+
 return self
 </code>
 </gretl-function>
@@ -238,6 +269,7 @@ return self
   <param name="self" type="bundleref"/>
  </params>
 <code>/* Add threshold for early stopping depending on early stopping type. */
+
 if self.early_stopping_strategy == &quot;residual_corr_abs&quot;
   # Abs. correlation has to improve at minimum by x units.
   scalar self.early_stopping_threshold = 0.01
@@ -252,6 +284,7 @@ endif
   <param name="self" type="bundleref"/>
  </params>
 <code>/* Demeaning series y and list X and compute associated std.-errors. */
+
 matrix self.my = cdemean({self.y}, TRUE)
 scalar self.ysd = sdc({self.y})
 matrix self.mX = cdemean({self.X_wo_constant}, TRUE)
@@ -265,6 +298,7 @@ matrix self.Xsd = sdc({self.X_wo_constant})
   <param name="X" type="list" const="true"/>
  </params>
 <code>/* Some initalizations. */
+
 scalar self.T = $nobs
 series self.y = y
 list self.X_wo_constant = X - const
@@ -274,6 +308,7 @@ if self.with_constant == TRUE
 else
   strings self.Xnames_wo_constant = self.Xnames
 endif
+
 # Initializations of variables for estimator function
 scalar self.resid_mean = 0
 matrix self.rho_values = mshape(NA, self.max_num_iterations, 1)
@@ -286,6 +321,7 @@ scalar self.actual_num_iterations = NA
   <param name="self" type="bundleref"/>
  </params>
 <code>/* Add post-estimation statistics to return bundle. */
+
 add_sd_of_uhat(&amp;self)
 add_first_order_residual_corr(&amp;self)
 get_insample_stats(&amp;self)
@@ -296,6 +332,7 @@ get_insample_stats(&amp;self)
   <param name="self" type="bundleref"/>
  </params>
 <code>/* Standard deviation of residuals */
+
 scalar self.uhat_variance = sd(self.uhat)
 </code>
 </gretl-function>
@@ -304,6 +341,7 @@ scalar self.uhat_variance = sd(self.uhat)
   <param name="self" type="bundleref"/>
  </params>
 <code>/* First order serial correlation coefficient. */
+
 if $datatype == 2
   matrix muhat = {self.uhat}
   muhat ~= mlag(muhat, 1)
@@ -317,11 +355,14 @@ endif
   <param name="self" type="bundle" const="true"/>
  </params>
 <code>/* Add active set of predictors to list. */
+
 list L = (self.with_constant == TRUE) ? const : null
 S = get_names_of_nonzero_coeffs(self)
+
 loop foreach i S
   list L += genseries(&quot;$i&quot;, X.$i)
 endloop
+
 return L
 </code>
 </gretl-function>
@@ -332,6 +373,7 @@ return L
   <param name="self" type="bundleref"/>
  </params>
 <code>/* Add final fitted values and residuals to bundle. */
+
 series self.yhat = lincomb(X, self.coeff)
 series self.uhat = y - self.yhat
 </code>
@@ -341,12 +383,14 @@ series self.uhat = y - self.yhat
   <param name="self" type="bundleref"/>
  </params>
 <code>/* Collect insample statistics of fit. */
+
 # from regls pkg.
 matrix stats = regls_get_stats(self.y, self.yhat)
 pos_mse = instrings(cnameget(stats), &quot;MSE&quot;)
 pos_r2 = instrings(cnameget(stats), &quot;R^2&quot;)
 self.r2 = stats[pos_r2]
 self.mse = stats[pos_mse]
+
 matrix r_squares = r2_stats(self.my, {self.yhat}, self.ncoeff)
 scalar self.r2_qcorr = r_squares[1]
 </code>
@@ -356,6 +400,7 @@ scalar self.r2_qcorr = r_squares[1]
   <param name="self" type="bundleref"/>
  </params>
 <code>/* Drop unnecessary stuff from bundle */
+
 delete self.Xsd
 delete self.ysd
 delete self.mX
@@ -371,7 +416,9 @@ delete self.resid_mean
   <param name="self" type="bundleref"/>
  </params>
 <code>/* Attach row labels to vector of point estimates. */
+
 strings S = array(0)
+
 S = (self.with_constant == TRUE) ? defarray(&quot;const&quot;) : S
 strings S += get_names_of_nonzero_coeffs(self)
 rnameset(self.coeff_nonzero, S)
@@ -383,6 +430,7 @@ rnameset(self.coeff, self.Xnames)
   <param name="self" type="bundleref"/>
  </params>
 <code>/* Wrapper for some post-processing. */
+
 get_valid_rho_values(&amp;self)
 cumsum_coefficient_paths(&amp;self)
 matrix self.coeff = get_rescaled_coeffs(self)
@@ -393,6 +441,7 @@ matrix self.coeff = get_rescaled_coeffs(self)
   <param name="self" type="bundleref"/>
  </params>
 <code>/* Cumulate iterative coefficient estimates, restrict vector length and attach column labels for each regressor (needed for optional plotting. */
+
 self.betas = cum(self.betas[1:self.actual_num_iterations,])
 cnameset(self.betas, self.Xnames_wo_constant)
 </code>
@@ -410,6 +459,7 @@ self.rho_values = self.rho_values[1:self.actual_num_iterations]
   <param name="self" type="bundle" const="true"/>
  </params>
 <code>/* Retrieve all final point estimates and rescale. */
+
 return self.betas[self.actual_num_iterations,]' .* (self.ysd ./ self.Xsd')
 </code>
 </gretl-function>
@@ -418,8 +468,10 @@ return self.betas[self.actual_num_iterations,]' .* (self.ysd ./ self.Xsd')
   <param name="self" type="bundle" const="true"/>
  </params>
 <code>/* Retrieve final non-zero point estimates. */
+
 matrix bhat_all = self.coeff
 matrix mask = (self.coeff .!= 0)
+
 return selifr(self.coeff, mask)
 </code>
 </gretl-function>
@@ -432,12 +484,15 @@ return selifr(self.coeff, mask)
  </params>
 <code>/* Compute correlations between &quot;y&quot; and all exogenous variables (&quot;X&quot;).
 Return maximum of absolute correlations. */
+
 scalar k = cols(yX) - 1
 matrix correlations = mshape(NA, k, 1)
+
 loop i=1..k
   correlations[i] = mcorr(yX[,1] ~ yX[,1+i])[1,2]
 endloop
 scalar position = imaxc(abs(correlations))
+
 return correlations[position]
 </code>
 </gretl-function>
@@ -446,6 +501,7 @@ return correlations[position]
   <param name="self" type="bundle" const="true"/>
  </params>
 <code>/* Print info message on early stopping*/
+
 if self.verbose &gt; 0
   printf &quot;\nInfo: No improvement in score '%s' for\n                 the last %d iterations.\nEarly stopping applies.\n&quot;, self.early_stopping_strategy, self.early_stopping_rounds
 endif
@@ -460,6 +516,7 @@ endif
   </param>
  </params>
 <code>/* */
+
 if self.verbose == 2
   printf &quot;\nInfo: Iteration %d out of %d: correlation coeff. = %g.\n&quot;, iteration, self.max_num_iterations, rho
 endif
@@ -473,11 +530,13 @@ endif
  </params>
 <code>/* Decision whether the early stopping criteria is met, or not.
 return: If the criteria is met, return TRUE, otherwise FALSE. */
+
 if self.early_stopping_strategy == &quot;residual_corr_abs&quot;
   scalar delta = abs(score_former) - abs(score_current)
 elif self.early_stopping_strategy == &quot;residual_corr_rel&quot;
   scalar delta = ( abs(score_former) - abs(score_current) ) / abs(score_former)
 endif
+
 if delta &lt; 0    # correlation increased
   return TRUE
 else
@@ -490,20 +549,26 @@ endif
   <param name="self" type="bundleref"/>
  </params>
 <code>/* Actual implementation of the boosting-like forward stagewise algorithm. */
+
 matrix yX = self.my ~ self.mX
+
 scalar n_rounds_no_improvement = 0
 scalar rho_value_former = NA
 scalar self.actual_num_iterations = 0
+
 loop i=1..self.max_num_iterations
   scalar position = NA
   self.actual_num_iterations++
   scalar col = (i &gt; 1) ? (i-1) : 1
+
   self.rho_values[i] = get_max_correlation(yX, &amp;position)
   print_iteration_details(self, $i, self.rho_values[i])
   delta = self.learning_rate * sgn(self.rho_values[i])
+
   # update beta and residuals
   self.betas[i, position] = self.betas[i, position] + delta
   yX[,1] = yX[,1] - delta * self.mX[, position]
+
   if i &gt; 1    # early stopping
     check = early_stopping_applies(self, self.rho_values[i-1], self.rho_values[i])
     if check == TRUE
@@ -512,6 +577,7 @@ loop i=1..self.max_num_iterations
       n_rounds_no_improvement = 0  # reset
     endif
   endif
+
   if n_rounds_no_improvement == self.early_stopping_rounds
     print_early_stopping_reached(self)
     break
@@ -526,21 +592,25 @@ endloop
  </params>
 <code>/* Retrieve columns of 'm' as identified by 'select'. If 'm' has no column labels or 'select' is empty, return empty matrix.
 return: matrix*/
+
 matrix ret
 strings labels_matrix = cnameget(m)
 if !nelem(labels_matrix) || !nelem(select)
   print &quot;WARNING: No columns selected.&quot;
   return ret
 endif
+
 loop foreach i select
   scalar pos = instrings(labels_matrix, &quot;$i&quot;)
   if pos
     ret ~= m[,pos]
   endif
 endloop
+
 if cols(ret)
   cnameset(ret, select)
 endif
+
 return ret
 </code>
 </gretl-function>
@@ -549,16 +619,19 @@ return ret
   <param name="self" type="bundle" const="true"/>
  </params>
 <code>/* Retrieve names variables for which point estimates are non-zero for optimal number of iterations. */
+
 matrix bhat_all = vec(self.betas[self.actual_num_iterations,])
 scalar n_nonzero_vars = sum(bhat_all .!= 0)
 strings selected_vars = array(n_nonzero_vars)
 scalar counter = 1
+
 loop i = 1..rows(bhat_all)
   if bhat_all[i] != 0
     selected_vars[counter] = self.Xnames_wo_constant[i]
     counter++
   endif
 endloop
+
 return selected_vars
 </code>
 </gretl-function>
@@ -575,8 +648,10 @@ return selected_vars
   </param>
  </params>
 <code>/* Helper function for computing different R-square statistics. */
+
 matrix y_true = vec(y_true)
 matrix y_pred = vec(y_pred)
+
 if rows(y_true) != rows(y_pred)
   printf &quot;\nError: Vectors y_true and y_pred are of different length.\n&quot;
   return NA
@@ -589,11 +664,13 @@ if isconst(y_true)
   printf &quot;\nError: Vector y_true is constant.\n&quot;
   return NA
 endif
+
 matrix R = NA * zeros(3,1)
 R[1] = r2_qcorr(&amp;y_true, &amp;y_pred)
 R[2] = r2_qcorr_adjusted(R[1], rows(y_true), num_parameters)
 R[3] = r2_score(y_true, y_pred)
 rnameset(R, &quot;r2_qcorr r2_qcorr_adj r2_score&quot;)
+
 return R
 </code>
 </gretl-function>
@@ -619,8 +696,10 @@ return corr(y_true, y_pred)^2
   </param>
  </params>
 <code>/* Adjusted R-square based on quadratic correlation */
+
 nominator = n - 1
 denominator = n - num_parameters - 1
+
 return 1 - (1-r2) * nominator/denominator
 </code>
 </gretl-function>
@@ -635,6 +714,7 @@ return 1 - (1-r2) * nominator/denominator
 Best possible score is 1.0 and it can be negative (because the
 model can be arbitrarily worse). A constant model that always
 predicts the expected value of y, disregarding the input features, would get a R^2 score of 0.0.
+
 Notes
 -----
 This is not a symmetric function.
@@ -647,20 +727,27 @@ References
 &lt;https://github.com/scikit-learn/scikit-learn/blob/
 1495f69242646d239d89a5713982946b8ffcf9d9/
 sklearn/metrics/regression.py#L449&gt;
+
 `Wikipedia entry on the Coefficient of determination
 &lt;https://en.wikipedia.org/wiki/Coefficient_of_determination&gt;`
 */
+
 # Initialize check values
 nonzero_denominator = 0
 nonzero_numerator = 0
 valid_score = 0
+
 # Compute statistics
 scalar numerator = sumc( (y_true-y_pred).^2)
 scalar denominator = sumc( (y_true-mean(y_true)).^2 )
+
 nonzero_denominator = (denominator != 0) ? 1 : nonzero_denominator
 nonzero_numerator = (numerator!=0) ? 1 : nonzero_numerator
+
 valid_score = (nonzero_denominator &amp;&amp; nonzero_numerator) ? 1 : valid_score
+
 output_scores = 1
+
 return (valid_score) ? (1 - numerator/denominator) : output_scores
 </code>
 </gretl-function>

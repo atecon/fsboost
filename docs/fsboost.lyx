@@ -116,7 +116,7 @@ literal "false"
 \end_layout
 
 \begin_layout Date
-Version 0.4
+Version 0.5
 \end_layout
 
 \begin_layout Standard
@@ -148,13 +148,26 @@ Changelog
 \begin_layout Itemize
 
 \size footnotesize
+Version 0.5 (July, 2023)
+\end_layout
+
+\begin_deeper
+\begin_layout Itemize
+
+\size footnotesize
+add cross-references in section 1 to other packages.
+\end_layout
+
+\end_deeper
+\begin_layout Itemize
+
+\size footnotesize
 Version 0.4 (March, 2023)
 \end_layout
 
 \begin_deeper
 \begin_layout Itemize
 
-\family typewriter
 \size footnotesize
 Improve printing of coefficient estimates
 \end_layout
@@ -296,8 +309,36 @@ Selecting the relevant predictors is a crucial task when working with a
 
 \begin_layout Standard
 So called shrinkage and/ or selection estimators such as Ridge or Lasso
- among others are known to handle such issues by imposing an additional
- restriction to an otherwise ordinary least square setting.
+ or stepwise-OLS among others are known to handle such issues by imposing
+ an additional restriction to an otherwise ordinary least square setting.
+\begin_inset Foot
+status open
+
+\begin_layout Plain Layout
+For running both the Ridge and Lasso (and hybrids) estimators, consider
+ the gretl addon 
+\begin_inset Quotes eld
+\end_inset
+
+regls
+\begin_inset Quotes erd
+\end_inset
+
+.
+ For sequential addition of variables to a model, you may be interested
+ in the function package 
+\begin_inset Quotes eld
+\end_inset
+
+addlist
+\begin_inset Quotes erd
+\end_inset
+
+.
+\end_layout
+
+\end_inset
+
  Another alternative estimation approach is the so called forward stagewise
  regression approach (
 \emph on
