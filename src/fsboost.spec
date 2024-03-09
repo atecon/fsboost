@@ -1,7 +1,7 @@
 author = Artur Tarassow
 email = atecon@posteo.de
 version = 0.5
-date = 2023-07-12
+date = 2024-03-09
 description = Forward-stagewise boosted regression estimates
 tags = C13 C52
 min-version = 2020e
